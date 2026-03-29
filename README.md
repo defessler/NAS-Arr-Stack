@@ -1,7 +1,71 @@
 # NAS Media Stack Setup Guide
 
+## Overview
+
+This is a self-hosted media automation stack running on a Synology DS1522+ NAS. The idea is simple: you tell it what you want to watch, and it finds, downloads, organises, and serves it to Plex automatically — with no manual file management.
+
+### How the pieces fit together
+
+```
+ Requests          Indexers          Download          Storage          Playback
+─────────────────────────────────────────────────────────────────────────────────
+                  ┌─────────┐
+                  │ Prowlarr│  ← manages all your torrent/usenet indexers
+                  └────┬────┘
+                       │ syncs indexers to
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+┌───────────┐  ┌───────────┐  ┌────────┐
+│  Sonarr   │  │  Radarr   │  │ Lidarr │  ← monitor TV / movies / music
+└─────┬─────┘  └─────┬─────┘  └───┬────┘
+      └───────────────┴────────────┘
+                      │ sends download jobs to
+             ┌────────┴────────┐
+             ▼                 ▼
+      ┌────────────┐   ┌──────────┐
+      │qBittorrent │   │ SABnzbd  │  ← torrent + usenet download clients
+      │ (via VPN)  │   │          │
+      └─────┬──────┘   └────┬─────┘
+            └───────┬────────┘
+                    │ downloads to /data/Downloads/
+                    │ Sonarr/Radarr/Lidarr hardlink to /data/Media/
+                    ▼
+             ┌────────────┐
+             │    Plex    │  ← streams your library to any device
+             └────────────┘
+```
+
+### What each service does
+
+| Service | Role |
+|---------|------|
+| **Plex** | Media server — streams your library to phones, TVs, browsers, Plex app |
+| **Sonarr** | TV show automation — monitors for new episodes, triggers downloads, imports |
+| **Radarr** | Movie automation — same as Sonarr but for movies |
+| **Lidarr** | Music automation — same pattern, for albums and tracks |
+| **Prowlarr** | Indexer manager — connects to torrent/usenet sites, syncs them to Sonarr/Radarr/Lidarr |
+| **Bazarr** | Subtitle automation — fetches subtitles for anything Sonarr/Radarr imports |
+| **qBittorrent** | Torrent client — all traffic routes through Gluetun VPN |
+| **SABnzbd** | Usenet client — downloads from usenet providers |
+| **Gluetun** | VPN gateway — qBittorrent's network runs entirely inside it (kill-switch) |
+| **Seerr** | Request portal — lets other people request movies/shows via a clean UI |
+| **Tautulli** | Plex analytics — watch history, stream stats, notifications |
+| **Recyclarr** | Quality profiles — auto-syncs TRaSH Guide best-practice profiles into Sonarr/Radarr |
+| **Unpackerr** | Extraction — watches for completed downloads and unpacks archives for import |
+
+### The key ideas
+
+**Hardlinks** — downloads and media live under the same `/data` mount. When Sonarr/Radarr import a file, they create a hardlink rather than copying it. The file exists in two places on the filesystem but uses disk space only once. qBittorrent keeps seeding the original; Plex reads the media copy. When you eventually remove the torrent, the media copy stays untouched.
+
+**VPN kill-switch** — qBittorrent doesn't have its own network. It runs inside Gluetun's network namespace, so if the VPN drops, qBittorrent loses connectivity entirely rather than falling back to your real IP.
+
+**Internal hostnames** — all containers share a Docker bridge network. They talk to each other by name (`http://sonarr:8989`, `http://radarr:7878`, etc.) rather than hardcoded IPs. No port forwarding or static IPs needed between services.
+
+---
+
 ## Table of Contents
 
+- [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [What's changed from the old setup](#whats-changed-from-the-old-setup)
 - [Scripts included](#scripts-included)
