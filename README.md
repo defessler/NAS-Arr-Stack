@@ -19,17 +19,28 @@
 - **PUID/PGID standardized** to 1034/100 across all containers (was inconsistent before)
 - **API keys** moved to `.env` file (no longer hardcoded in docker run commands)
 
+## Scripts included
+
+| Script | What it does |
+|--------|-------------|
+| `setup.sh` | Master script — runs all setup steps below in order |
+| `setup-folders.sh` | Creates all required directories and sets correct ownership |
+| `setup-firewall.sh` | Applies iptables firewall rules for the stack |
+
+Run `setup.sh` once after copying files to the NAS. It handles folders, permissions, and firewall in one go.
+
 ## What you need to do manually
 
 Most of this stack is automated, but some things require human action. Here's everything that can't be scripted:
 
 ### Before first boot
-- [ ] Get WireGuard credentials from your VPN provider (private key, addresses, server country)
+- [ ] Get your NordVPN WireGuard private key (see below)
 - [ ] Get a Plex claim token from https://plex.tv/claim (wait until right before `docker-compose up`)
+- [ ] Copy all repo files to the NAS (Step 1)
 - [ ] Fill in the `.env` file with all values (Step 2)
-- [ ] Create config directories on the NAS (Step 3)
-- [ ] Fix file ownership for Seerr config dir: `chown -R 1034:100 /volume1/docker/media/seerr`
-- [ ] Migrate Plex data from the native package (Step 4)
+- [ ] Run `setup.sh` to create folders, set permissions, and apply firewall rules (Step 3)
+- [ ] Install firewall script to survive reboots (Step 4)
+- [ ] Migrate Plex data from the native package (Step 5)
 
 ### After first boot
 - [ ] Update root folder paths in Sonarr, Radarr, and Lidarr (Step 9)
@@ -69,15 +80,15 @@ extracted from archives. The download copy can be cleaned up after import.
 
 ---
 
-## Step 1: Copy the compose files to the NAS
+## Step 1: Copy all files to the NAS
 
-Copy `docker-compose.yml` and `.env` to `/volume1/docker/media/` on the NAS.
+Copy the entire repo contents to `/volume1/docker/media/` on the NAS.
 
-Via SMB — open `\\192.168.1.242` in File Explorer, navigate to `docker/media`, drag them in.
+Via SMB — open `\\192.168.1.242` in File Explorer, navigate to `docker/media`, drag everything in.
 
 Or via SCP:
 ```bash
-scp docker-compose.yml .env user@192.168.1.242:/volume1/docker/media/
+scp docker-compose.yml .env setup.sh setup-folders.sh setup-firewall.sh user@192.168.1.242:/volume1/docker/media/
 ```
 
 ## Step 2: Fill in the .env file
@@ -106,27 +117,26 @@ VPN_COUNTRIES=             # e.g. United States, Netherlands, Switzerland
 
 Save and exit (`Ctrl+X`, `Y`, `Enter`).
 
-## Step 3: Create config folders for new services
+## Step 3: Run setup.sh
 
-SSH into the NAS and run:
+This creates all directories, sets correct ownership, and applies firewall rules:
 ```bash
-mkdir -p /volume1/docker/media/plex/config \
-         /volume1/docker/media/prowlarr/config \
-         /volume1/docker/media/qbittorrent/config \
-         /volume1/docker/media/tautulli/config \
-         /volume1/docker/media/seerr/config \
-         /volume1/docker/media/sabnzbd/config \
-         /volume1/docker/media/unpackerr/config \
-         /volume1/docker/media/radarr/config \
-         /volume1/docker/media/sonarr/config \
-         /volume1/docker/media/bazarr/config \
-         /volume1/docker/media/lidarr/config \
-         /volume1/docker/media/recyclarr/config
+sudo bash /volume1/docker/media/setup.sh
 ```
 
-Existing service configs (sonarr, radarr, sabnzbd, bazarr, unpackerr) are already in place from the migration.
+Each step prints `Created` or `Exists` for every folder, then confirms the firewall rules are applied. Safe to re-run at any time.
 
-## Step 4: Migrate Plex data from native app
+## Step 4: Install the firewall script to survive reboots
+
+Synology doesn't persist iptables rules across reboots. This installs the firewall script so it runs automatically on every boot:
+```bash
+sudo cp /volume1/docker/media/setup-firewall.sh /usr/local/etc/rc.d/media-firewall.sh
+sudo chmod 755 /usr/local/etc/rc.d/media-firewall.sh
+```
+
+Only needs to be done once. If you update `setup-firewall.sh` later, re-run these two commands to copy the new version.
+
+## Step 5: Migrate Plex data from native app
 
 Find your Plex data on the NAS. Check:
 ```bash
@@ -141,19 +151,6 @@ Adjust the source path to wherever your Plex data actually lives.
 
 If the native Plex package is installed, **stop and disable it**:
 Package Center → Plex Media Server → Stop → set to not auto-start.
-
-## Step 5: Fix file permissions
-
-The old setup used inconsistent user IDs. The new setup standardizes to 1034/100:
-```bash
-chown -R 1034:100 /volume1/docker/media/sabnzbd
-chown -R 1034:100 /volume1/Data/Downloads/Usenet
-```
-
-Seerr config dir needs the same ownership as everything else:
-```bash
-chown -R 1034:100 /volume1/docker/media/seerr
-```
 
 ## Step 6: Get a Plex claim token
 
