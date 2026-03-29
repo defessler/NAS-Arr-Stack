@@ -10,11 +10,20 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 
-# Read PUID/PGID from .env, fall back to safe defaults
-PUID=$(grep -m1 '^PUID=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-)
-PGID=$(grep -m1 '^PGID=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-)
-PUID="${PUID:-1034}"
-PGID="${PGID:-100}"
+# Read PUID/PGID from .env — required, no fallback
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: .env not found at $ENV_FILE"
+    echo "Run setup-nordvpn.sh first, or create .env with PUID and PGID set."
+    exit 1
+fi
+
+PUID=$(grep -m1 '^PUID=' "$ENV_FILE" | cut -d'=' -f2-)
+PGID=$(grep -m1 '^PGID=' "$ENV_FILE" | cut -d'=' -f2-)
+
+if [ -z "$PUID" ] || [ -z "$PGID" ]; then
+    echo "Error: PUID and PGID must both be set in $ENV_FILE"
+    exit 1
+fi
 
 echo "Using PUID=$PUID PGID=$PGID (from ${ENV_FILE})"
 echo ""
