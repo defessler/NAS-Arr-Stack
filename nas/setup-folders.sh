@@ -113,7 +113,7 @@ if [ -z "$HASH" ]; then
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-    printf '[LegalNotice]\nAccepted=true\n\n[BitTorrent]\nSession\DefaultSavePath=/data/Downloads/Torrents/Completed\nSession\TempPath=/data/Downloads/Torrents/InProgress\nSession\TempPathEnabled=true\n\n[Preferences]\nDownloads\SavePath=/data/Downloads/Torrents/Completed\nDownloads\TempPath=/data/Downloads/Torrents/InProgress\nDownloads\TempPathEnabled=true\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
+    printf '[LegalNotice]\nAccepted=true\n\n[BitTorrent]\nSession\DefaultSavePath=/downloads/Completed\nSession\TempPath=/downloads/InProgress\nSession\TempPathEnabled=true\n\n[Preferences]\nDownloads\SavePath=/downloads/Completed\nDownloads\TempPath=/downloads/InProgress\nDownloads\TempPathEnabled=true\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
         "$USERNAME" "$HASH" > "$CONF_FILE"
 else
     printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \

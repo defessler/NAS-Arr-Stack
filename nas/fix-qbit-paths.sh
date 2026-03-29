@@ -52,11 +52,11 @@ QB_URL="http://${QB_HOST}:${QB_PORT}"
 # Add or edit entries to match your categories.
 
 declare -A CATEGORY_PATHS
-CATEGORY_PATHS["tv-sonarr"]="/data/Downloads/Torrents/Completed/tv-sonarr"
-CATEGORY_PATHS["radarr"]="/data/Downloads/Torrents/Completed/radarr"
-CATEGORY_PATHS["lidarr"]="/data/Downloads/Torrents/Completed/lidarr"
+CATEGORY_PATHS["tv-sonarr"]="/downloads/Completed/tv-sonarr"
+CATEGORY_PATHS["radarr"]="/downloads/Completed/radarr"
+CATEGORY_PATHS["lidarr"]="/downloads/Completed/lidarr"
 # Torrents with no category land here
-DEFAULT_PATH="/data/Downloads/Torrents/Completed"
+DEFAULT_PATH="/downloads/Completed"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

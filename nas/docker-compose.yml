@@ -184,7 +184,7 @@ services:
     volumes:
       - /volume1/docker/media/qbittorrent/config:/config
       - /volume1/docker/media/qbittorrent/custom-cont-init.d:/custom-cont-init.d:ro
-      - /volume1/Data:/data
+      - /volume1/Data/Downloads/Torrents:/downloads
     restart: unless-stopped
 
   sabnzbd:
@@ -199,7 +199,7 @@ services:
       - ${LAN_IP}:49155:8080
     volumes:
       - /volume1/docker/media/sabnzbd/config:/config
-      - /volume1/Data:/data
+      - /volume1/Data/Downloads/Usenet:/data
     restart: unless-stopped
 
   recyclarr:

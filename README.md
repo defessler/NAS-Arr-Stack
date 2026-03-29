@@ -163,7 +163,7 @@ NordVPN handles the server addresses automatically, so no `VPN_ADDRESSES` is nee
 
 ```
 1. Sonarr/Radarr/Lidarr send a download to qBittorrent or SABnzbd
-2. Download goes to /data/Downloads/Torrents/InProgress/ (or /data/Downloads/Usenet/incomplete)
+2. Download goes to /downloads/InProgress/ (or /data/incomplete for usenet)
 3. When complete, Sonarr/Radarr/Lidarr create a HARDLINK in /data/Media/
    - Same file, two paths, NO extra disk space used
    - The original stays in the download folder for seeding
@@ -288,29 +288,35 @@ Open each service in your browser using the URLs in the Quick Reference section 
 
 ## Step 9: Update paths in all services
 
-All containers now mount `/volume1/Data` as `/data`. The old paths (`/downloads`,
-`/movies`, `/tv/shows`, etc.) no longer exist inside the containers. Update each
-service to use the new paths:
+Path layout inside each container:
+
+| Service | Mount | NAS path |
+|---|---|---|
+| qBittorrent | `/downloads` | `/volume1/Data/Downloads/Torrents` |
+| SABnzbd | `/data` | `/volume1/Data/Downloads/Usenet` |
+| Sonarr / Radarr / Lidarr / Bazarr | `/data` | `/volume1/Data` |
+
+Because qBittorrent uses `/downloads` while Sonarr/Radarr use `/data`, you need a **Remote Path Mapping** in each *arr so they can find the files qBittorrent downloaded. Hardlinks still work — both containers are reading from the same physical NAS volume.
 
 ### qBittorrent (http://192.168.1.242:49156)
 Settings → Downloads:
-- Default Save Path: `/data/Downloads/Torrents/Completed`
-- Keep incomplete torrents in: `/data/Downloads/Torrents/InProgress` ✓ enabled
+- Default Save Path: `/downloads/Completed`
+- Keep incomplete torrents in: `/downloads/InProgress` ✓ enabled
 
 Files live in `InProgress` while downloading, then move to `Completed` when done.
-Sonarr and Radarr override the save path per-torrent using categories:
-- Sonarr downloads → `/data/Downloads/Torrents/Completed/tv-sonarr`
-- Radarr downloads → `/data/Downloads/Torrents/Completed/radarr`
+Sonarr and Radarr set the save path per-torrent via categories:
+- Sonarr downloads → `/downloads/Completed/tv-sonarr`
+- Radarr downloads → `/downloads/Completed/radarr`
 
 **Watched folder (auto-add .torrent files)** — Settings → Downloads → Automatically add torrents from:
-- `/data/Downloads/Torrents/ToFetch`
+- `/downloads/ToFetch`
 
 > ⚠️ The watched folder must be set manually in the qBittorrent UI — it uses a complex config format that can't be written by the init script.
 
 ### SABnzbd (http://192.168.1.242:49155)
 Settings → Folders:
-- Temporary Download Folder: `/data/Downloads/Usenet/incomplete`
-- Completed Download Folder: `/data/Downloads/Usenet/complete`
+- Temporary Download Folder: `/data/incomplete`
+- Completed Download Folder: `/data/complete`
 
 ### Sonarr (http://192.168.1.242:49152)
 
@@ -328,7 +334,9 @@ Settings → Folders:
 **Download clients** — Settings → Download Clients:
 - qBittorrent: host = `qbittorrent`, port = `8080`
 - SABnzbd: host = `sabnzbd`, port = `8080`
-- **Delete any Remote Path Mappings** (no longer needed)
+
+**Remote Path Mappings** — Settings → Download Clients → Remote Path Mappings:
+- Host: `qbittorrent` | Remote Path: `/downloads` | Local Path: `/data/Downloads/Torrents`
 
 ### Radarr (http://192.168.1.242:49151)
 
@@ -346,7 +354,9 @@ Settings → Folders:
 **Download clients** — Settings → Download Clients:
 - qBittorrent: host = `qbittorrent`, port = `8080`
 - SABnzbd: host = `sabnzbd`, port = `8080`
-- **Delete any Remote Path Mappings** (no longer needed)
+
+**Remote Path Mappings** — Settings → Download Clients → Remote Path Mappings:
+- Host: `qbittorrent` | Remote Path: `/downloads` | Local Path: `/data/Downloads/Torrents`
 
 ### Lidarr (http://192.168.1.242:49154)
 
@@ -359,6 +369,9 @@ Settings → Folders:
 **Download clients** — Settings → Download Clients:
 - qBittorrent: host = `qbittorrent`, port = `8080`
 - SABnzbd: host = `sabnzbd`, port = `8080`
+
+**Remote Path Mappings** — Settings → Download Clients → Remote Path Mappings:
+- Host: `qbittorrent` | Remote Path: `/downloads` | Local Path: `/data/Downloads/Torrents`
 
 ### Bazarr (http://192.168.1.242:49153)
 
@@ -466,7 +479,7 @@ docker-compose logs gluetun
 1. Verify Gluetun is connected (see Step 13 above)
 2. Search for something in Sonarr or Radarr
 3. Trigger a manual download via torrent — verify:
-   - qBittorrent downloads to `/data/Downloads/Torrents/Completed/` (via `/InProgress/` while active)
+   - qBittorrent downloads to `/downloads/Completed/` (via `/downloads/InProgress/` while active)
    - Sonarr/Radarr imports it to `/data/Media/`
    - qBittorrent keeps seeding after import
    - Check Sonarr/Radarr activity log says "hardlinked" (not "copied")
