@@ -38,7 +38,8 @@ DATA_DIRS=(
     /volume1/Data/Media/Anime/Movies
     /volume1/Data/Media/Anime/TV\ Shows
     /volume1/Data/Media/Music
-    /volume1/Data/Downloads/Torrents/InProgress
+    /volume1/Data/Downloads/Torrents/InProgress/tv-sonarr
+    /volume1/Data/Downloads/Torrents/InProgress/radarr
     /volume1/Data/Downloads/Usenet
 )
 

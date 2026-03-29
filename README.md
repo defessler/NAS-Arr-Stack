@@ -296,6 +296,10 @@ service to use the new paths:
 Settings → Downloads:
 - Default Save Path: `/data/Downloads/Torrents/InProgress`
 
+Sonarr and Radarr will override this per-torrent using categories:
+- Sonarr downloads → `/data/Downloads/Torrents/InProgress/tv-sonarr`
+- Radarr downloads → `/data/Downloads/Torrents/InProgress/radarr`
+
 ### SABnzbd (http://192.168.1.242:49155)
 Settings → Folders:
 - Completed Download Folder: `/data/Downloads/Usenet`
