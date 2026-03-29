@@ -136,7 +136,7 @@ SKIPPED=0
 ERRORS=0
 
 while IFS='|' read -r HASH CATEGORY CURRENT_PATH NAME; do
-    [ -z "$HASH" ] && continue
+    if [ -z "$HASH" ]; then continue; fi
 
     # Determine the correct path for this torrent
     if [ -n "$CATEGORY" ] && [ -n "${CATEGORY_PATHS[$CATEGORY]+_}" ]; then
@@ -159,18 +159,27 @@ while IFS='|' read -r HASH CATEGORY CURRENT_PATH NAME; do
     echo "           $CURRENT_PATH  →  $TARGET_PATH"
 
     if ! $DRY_RUN; then
-        if qb_post /api/v2/torrents/setLocation \
+        # -s = silent, -w = write HTTP status code, -o = capture body separately
+        RESP_BODY=$(mktemp)
+        HTTP_STATUS=$(curl -s -o "$RESP_BODY" -w "%{http_code}" \
+            --cookie "$COOKIE_FILE" --cookie-jar "$COOKIE_FILE" \
+            -X POST "${QB_URL}/api/v2/torrents/setLocation" \
             --data-urlencode "hashes=${HASH}" \
-            --data-urlencode "location=${TARGET_PATH}" > /dev/null; then
+            --data-urlencode "location=${TARGET_PATH}" 2>&1) || HTTP_STATUS="000"
+        BODY=$(cat "$RESP_BODY" 2>/dev/null); rm -f "$RESP_BODY"
+
+        if [ "$HTTP_STATUS" = "200" ]; then
+            echo "  OK       moved"
             MOVED=$((MOVED + 1))
         else
-            echo "  ERROR    Failed to move: $NAME"
+            echo "  ERROR    HTTP $HTTP_STATUS${BODY:+ — $BODY}"
             ERRORS=$((ERRORS + 1))
         fi
 
         if $DO_RECHECK; then
-            qb_post /api/v2/torrents/recheck \
-                --data-urlencode "hashes=${HASH}" > /dev/null || true
+            curl -s --cookie "$COOKIE_FILE" \
+                -X POST "${QB_URL}/api/v2/torrents/recheck" \
+                --data-urlencode "hashes=${HASH}" > /dev/null 2>&1 || true
         fi
     else
         MOVED=$((MOVED + 1))
