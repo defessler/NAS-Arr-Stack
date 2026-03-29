@@ -1,0 +1,170 @@
+services:
+
+  # ── Media Server ──────────────────────────────────────────
+
+  plex:
+    image: linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM}
+    volumes:
+      - /volume1/docker/media/plex/config:/config
+      - /volume1/Data/Media/Movies:/movies
+      - /volume1/Data/Media/TV Shows:/tv/shows
+      - /volume1/Data/Media/Anime/Movies:/anime/movies
+      - /volume1/Data/Media/Anime/TV Shows:/anime/tv
+    # Uncomment for Intel Arc GPU transcoding later:
+    # devices:
+    #   - /dev/dri:/dev/dri
+    restart: unless-stopped
+
+  tautulli:
+    image: linuxserver/tautulli:latest
+    container_name: tautulli
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 8181:8181
+    volumes:
+      - /volume1/docker/media/tautulli/config:/config
+    restart: unless-stopped
+
+  overseerr:
+    image: linuxserver/overseerr:latest
+    container_name: overseerr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 5055:5055
+    volumes:
+      - /volume1/docker/media/overseerr/config:/config
+    restart: unless-stopped
+
+  # ── Indexer / Management ──────────────────────────────────
+
+  prowlarr:
+    image: linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 49150:9696
+    volumes:
+      - /volume1/docker/media/prowlarr/config:/config
+    restart: unless-stopped
+
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 49152:8989
+    volumes:
+      - /volume1/docker/media/sonarr/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 49151:7878
+    volumes:
+      - /volume1/docker/media/radarr/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
+  bazarr:
+    image: linuxserver/bazarr:latest
+    container_name: bazarr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 49153:6767
+    volumes:
+      - /volume1/docker/media/bazarr/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
+  # ── Download Clients ──────────────────────────────────────
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+    ports:
+      - 49156:8080
+      - 6881:6881
+      - 6881:6881/udp
+    volumes:
+      - /volume1/docker/media/qbittorrent/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
+  sabnzbd:
+    image: linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - 49155:8080
+    volumes:
+      - /volume1/docker/media/sabnzbd/config:/config
+      - /volume1/Data:/data
+      - /volume1/docker/media/sabnzbd/Downloads/incomplete:/incomplete-downloads
+    restart: unless-stopped
+
+  unpackerr:
+    image: golift/unpackerr:latest
+    container_name: unpackerr
+    networks: [media]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UN_SONARR_0_URL=http://sonarr:8989
+      - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
+      - UN_RADARR_0_URL=http://radarr:7878
+      - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
+    volumes:
+      - /volume1/docker/media/unpackerr/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
+networks:
+  media:
+    driver: bridge
