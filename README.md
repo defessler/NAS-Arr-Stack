@@ -207,10 +207,14 @@ PLEX_CLAIM=                # from https://plex.tv/claim (expires in 4 min — fi
 SONARR_API_KEY=            # from Sonarr → Settings → General
 RADARR_API_KEY=            # from Radarr → Settings → General
 
+# qBittorrent WebUI credentials — set before first boot
+QBITTORRENT_USER=admin
+QBITTORRENT_PASS=          # choose any password
+
 # Gluetun VPN (NordVPN)
 VPN_PROVIDER=nordvpn
 VPN_TYPE=wireguard
-NORDVPN_PRIVATE_KEY=       # from my.nordaccount.com → NordVPN → Manual config → WireGuard
+NORDVPN_PRIVATE_KEY=       # leave blank — setup-nordvpn.sh fills this in automatically
 VPN_COUNTRIES=             # e.g. United States, Netherlands, Switzerland
 ```
 
@@ -218,12 +222,20 @@ Save and exit (`Ctrl+X`, `Y`, `Enter`).
 
 ## Step 3: Run setup.sh
 
-This creates all directories, sets correct ownership, and applies firewall rules:
+This runs all setup steps in order:
 ```bash
 sudo bash /volume1/docker/media/setup.sh
 ```
 
-Each step prints `Created` or `Exists` for every folder, then confirms the firewall rules are applied. Safe to re-run at any time.
+What it does:
+1. Sets correct permissions on all scripts and config files
+2. Creates all required directories with correct ownership
+3. Deploys the qBittorrent credential init script
+4. Applies firewall rules and installs them to survive reboots
+5. Fetches your NordVPN WireGuard private key and writes it to `.env`
+6. Validates the full configuration
+
+Safe to re-run at any time.
 
 ## Step 4: Install the firewall script to survive reboots
 
