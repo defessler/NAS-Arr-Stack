@@ -200,7 +200,6 @@ services:
     volumes:
       - /volume1/docker/media/sabnzbd/config:/config
       - /volume1/Data:/data
-      - /volume1/docker/media/sabnzbd/Downloads/incomplete:/incomplete-downloads
     restart: unless-stopped
 
   recyclarr:

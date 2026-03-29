@@ -39,9 +39,11 @@ DATA_DIRS=(
     /volume1/Data/Media/Anime/TV\ Shows
     /volume1/Data/Media/Music
     /volume1/Data/Downloads/Torrents/ToFetch
-    /volume1/Data/Downloads/Torrents/InProgress/tv-sonarr
-    /volume1/Data/Downloads/Torrents/InProgress/radarr
-    /volume1/Data/Downloads/Usenet
+    /volume1/Data/Downloads/Torrents/InProgress
+    /volume1/Data/Downloads/Torrents/Completed/tv-sonarr
+    /volume1/Data/Downloads/Torrents/Completed/radarr
+    /volume1/Data/Downloads/Usenet/incomplete
+    /volume1/Data/Downloads/Usenet/complete
 )
 
 # ── Create and chown ───────────────────────────────────────────────────────────
@@ -111,7 +113,7 @@ if [ -z "$HASH" ]; then
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-    printf '[LegalNotice]\nAccepted=true\n\n[BitTorrent]\nSession\DefaultSavePath=/data/Downloads/Torrents/InProgress\nSession\TempPath=/data/Downloads/Torrents/ToFetch\nSession\TempPathEnabled=true\n\n[Preferences]\nDownloads\SavePath=/data/Downloads/Torrents/InProgress\nDownloads\TempPath=/data/Downloads/Torrents/ToFetch\nDownloads\TempPathEnabled=true\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
+    printf '[LegalNotice]\nAccepted=true\n\n[BitTorrent]\nSession\DefaultSavePath=/data/Downloads/Torrents/Completed\nSession\TempPath=/data/Downloads/Torrents/InProgress\nSession\TempPathEnabled=true\n\n[Preferences]\nDownloads\SavePath=/data/Downloads/Torrents/Completed\nDownloads\TempPath=/data/Downloads/Torrents/InProgress\nDownloads\TempPathEnabled=true\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
         "$USERNAME" "$HASH" > "$CONF_FILE"
 else
     printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \

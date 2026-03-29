@@ -131,9 +131,11 @@ REQUIRED_DIRS=(
     "/volume1/Data/Media/Anime/TV Shows"
     /volume1/Data/Media/Music
     /volume1/Data/Downloads/Torrents/ToFetch
-    /volume1/Data/Downloads/Torrents/InProgress/tv-sonarr
-    /volume1/Data/Downloads/Torrents/InProgress/radarr
-    /volume1/Data/Downloads/Usenet
+    /volume1/Data/Downloads/Torrents/InProgress
+    /volume1/Data/Downloads/Torrents/Completed/tv-sonarr
+    /volume1/Data/Downloads/Torrents/Completed/radarr
+    /volume1/Data/Downloads/Usenet/incomplete
+    /volume1/Data/Downloads/Usenet/complete
 )
 
 for dir in "${REQUIRED_DIRS[@]}"; do
