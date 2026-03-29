@@ -72,6 +72,8 @@ check_var "VPN_PROVIDER"
 check_var "VPN_TYPE"
 check_var "VPN_COUNTRIES"
 check_var "NORDVPN_PRIVATE_KEY"
+check_var "QBITTORRENT_USER"
+check_var "QBITTORRENT_PASS"
 
 # Validate LAN_IP looks like an IP address
 LAN_IP=$(env_val "LAN_IP")

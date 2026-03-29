@@ -170,8 +170,11 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - WEBUI_PORT=8080
+      - WEBUI_USERNAME=${QBITTORRENT_USER:-admin}
+      - WEBUI_PASSWORD=${QBITTORRENT_PASS}
     volumes:
       - /volume1/docker/media/qbittorrent/config:/config
+      - /volume1/docker/media/qbittorrent/custom-cont-init.d:/custom-cont-init.d:ro
       - /volume1/Data:/data
     restart: unless-stopped
 

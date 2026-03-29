@@ -23,6 +23,7 @@ CONFIG_DIRS=(
     /volume1/docker/media/lidarr/config
     /volume1/docker/media/qbittorrent/config
     /volume1/docker/media/qbittorrent/config/.cache/qBittorrent
+    /volume1/docker/media/qbittorrent/custom-cont-init.d
     /volume1/docker/media/sabnzbd/config
     /volume1/docker/media/sabnzbd/Downloads/incomplete
     /volume1/docker/media/recyclarr/config
@@ -67,6 +68,19 @@ for dir in "${DATA_DIRS[@]}"; do
     chown -R $PUID:$PGID "$dir"
     chmod -R 755 "$dir"
 done
+
+echo ""
+echo "Deploying qBittorrent init script..."
+INIT_SRC="$SCRIPT_DIR/qbittorrent-init.sh"
+INIT_DST="/volume1/docker/media/qbittorrent/custom-cont-init.d/set-credentials.sh"
+if [ -f "$INIT_SRC" ]; then
+    cp "$INIT_SRC" "$INIT_DST"
+    chown $PUID:$PGID "$INIT_DST"
+    chmod 755 "$INIT_DST"
+    echo "  Deployed: $INIT_DST"
+else
+    echo "  ⚠ qbittorrent-init.sh not found — skipping credential init setup"
+fi
 
 echo ""
 echo "Done. All folders are ready."
