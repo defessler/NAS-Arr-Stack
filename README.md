@@ -111,6 +111,8 @@ SONARR_API_KEY=            # from Sonarr → Settings → General
 RADARR_API_KEY=            # from Radarr → Settings → General
 
 # Gluetun VPN (NordVPN)
+VPN_PROVIDER=nordvpn
+VPN_TYPE=wireguard
 NORDVPN_PRIVATE_KEY=       # from my.nordaccount.com → NordVPN → Manual config → WireGuard
 VPN_COUNTRIES=             # e.g. United States, Netherlands, Switzerland
 ```
