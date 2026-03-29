@@ -295,8 +295,10 @@ service to use the new paths:
 ### qBittorrent (http://192.168.1.242:49156)
 Settings → Downloads:
 - Default Save Path: `/data/Downloads/Torrents/InProgress`
+- Keep incomplete torrents in: `/data/Downloads/Torrents/ToFetch` ✓ enabled
 
-Sonarr and Radarr will override this per-torrent using categories:
+Files download to `ToFetch` while in progress, then move to `InProgress` on completion.
+Sonarr and Radarr override the save path per-torrent using categories:
 - Sonarr downloads → `/data/Downloads/Torrents/InProgress/tv-sonarr`
 - Radarr downloads → `/data/Downloads/Torrents/InProgress/radarr`
 
