@@ -51,6 +51,7 @@ for dir in "${CONFIG_DIRS[@]}"; do
         echo "  Exists:  $dir"
     fi
     chown -R $PUID:$PGID "$dir"
+    chmod -R 755 "$dir"
 done
 
 echo ""
@@ -63,6 +64,7 @@ for dir in "${DATA_DIRS[@]}"; do
         echo "  Exists:  $dir"
     fi
     chown -R $PUID:$PGID "$dir"
+    chmod -R 755 "$dir"
 done
 
 echo ""
