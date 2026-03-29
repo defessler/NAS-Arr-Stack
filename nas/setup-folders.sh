@@ -25,7 +25,6 @@ CONFIG_DIRS=(
     /volume1/docker/media/qbittorrent/config/.cache/qBittorrent
     /volume1/docker/media/qbittorrent/custom-cont-init.d
     /volume1/docker/media/sabnzbd/config
-    /volume1/docker/media/sabnzbd/Downloads/incomplete
     /volume1/docker/media/recyclarr/config
     /volume1/docker/media/unpackerr/config
 )
