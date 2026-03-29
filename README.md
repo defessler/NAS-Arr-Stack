@@ -1,5 +1,31 @@
 # NAS Media Stack Setup Guide
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [What's changed from the old setup](#whats-changed-from-the-old-setup)
+- [Scripts included](#scripts-included)
+- [What you need to do manually](#what-you-need-to-do-manually)
+- [How downloads and seeding work](#how-downloads-and-seeding-work-with-this-setup)
+- [Step 1: Copy all files to the NAS](#step-1-copy-all-files-to-the-nas)
+- [Step 2: Fill in the .env file](#step-2-fill-in-the-env-file)
+- [Step 3: Run setup.sh](#step-3-run-setupsh)
+- [Step 4: Install the firewall script to survive reboots](#step-4-install-the-firewall-script-to-survive-reboots)
+- [Step 5: Migrate Plex data from native app](#step-5-migrate-plex-data-from-native-app)
+- [Step 6: Get a Plex claim token](#step-6-get-a-plex-claim-token)
+- [Step 7: Start everything](#step-7-start-everything)
+- [Step 8: Verify all services load](#step-8-verify-all-services-load)
+- [Step 9: Update paths in all services](#step-9-update-paths-in-all-services)
+- [Step 10: Configure qBittorrent seeding behavior](#step-10-configure-qbittorrent-seeding-behavior)
+- [Step 11: Set up Prowlarr](#step-11-set-up-prowlarr-replaces-jackett)
+- [Step 12: Clean up old Jackett indexers](#step-12-clean-up-old-jackett-indexers)
+- [Step 13: Set up new services](#step-13-set-up-new-services)
+- [Step 14: Test end-to-end](#step-14-test-end-to-end)
+- [Troubleshooting](#troubleshooting)
+- [Quick Reference](#quick-reference)
+
+---
+
 ## Prerequisites
 - New DS1522+ with DSM installed
 - All media files already at `/volume1/Data/Media/`
