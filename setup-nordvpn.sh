@@ -15,16 +15,22 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-echo ""
-echo "  To get your access token:"
-echo "  1. Go to https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/"
-echo "  2. Click Access Tokens → Generate new token"
-echo "  3. Paste it below"
-echo ""
-read -rp "  NordVPN access token: " ACCESS_TOKEN
+# Read access token from .env if set
+ACCESS_TOKEN=$(grep -m1 '^NORDVPN_ACCESS_TOKEN=' "$ENV_FILE" | cut -d'=' -f2)
 
 if [ -z "$ACCESS_TOKEN" ]; then
-    echo "  ✘ No token entered."
+    echo ""
+    echo "  NORDVPN_ACCESS_TOKEN not set in .env — enter it manually."
+    echo "  To get your access token:"
+    echo "  1. Go to https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/"
+    echo "  2. Click Access Tokens → Generate new token"
+    echo "  3. Paste it below (or add it to .env to skip this prompt next time)"
+    echo ""
+    read -rp "  NordVPN access token: " ACCESS_TOKEN
+fi
+
+if [ -z "$ACCESS_TOKEN" ]; then
+    echo "  ✘ No token provided."
     exit 1
 fi
 
