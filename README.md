@@ -21,13 +21,21 @@
 
 ## Scripts included
 
-| Script | What it does |
-|--------|-------------|
+All files that need to be deployed to the NAS live in the `nas/` folder.
+
+| File | What it does |
+|------|-------------|
+| `docker-compose.yml` | The full stack definition |
+| `.env` | Your local config and secrets — never committed to git |
 | `setup.sh` | Master script — runs all setup steps below in order |
+| `setup-chmod.sh` | Sets correct permissions on all stack files |
 | `setup-folders.sh` | Creates all required directories and sets correct ownership |
 | `setup-firewall.sh` | Applies iptables firewall rules for the stack |
+| `setup-nordvpn.sh` | Fetches NordVPN WireGuard key and writes it to .env |
+| `setup-validate.sh` | Validates everything is configured correctly before starting |
+| `post-deploy-validate.sh` | Validates the stack is working after docker-compose up |
 
-Run `setup.sh` once after copying files to the NAS. It handles folders, permissions, and firewall in one go.
+Run `setup.sh` once after copying files to the NAS. It handles everything in one go.
 
 ## What you need to do manually
 
@@ -82,13 +90,13 @@ extracted from archives. The download copy can be cleaned up after import.
 
 ## Step 1: Copy all files to the NAS
 
-Copy the entire repo contents to `/volume1/docker/media/` on the NAS.
+Everything that needs to be deployed lives in the `nas/` folder. Copy its contents to `/volume1/docker/media/` on the NAS.
 
-Via SMB — open `\\192.168.1.242` in File Explorer, navigate to `docker/media`, drag everything in.
+Via SMB — open `\\192.168.1.242` in File Explorer, navigate to `docker/media`, drag the contents of the `nas/` folder in.
 
 Or via SCP:
 ```bash
-scp docker-compose.yml .env setup.sh setup-folders.sh setup-firewall.sh user@192.168.1.242:/volume1/docker/media/
+scp nas/* nas/.env user@192.168.1.242:/volume1/docker/media/
 ```
 
 ## Step 2: Fill in the .env file
