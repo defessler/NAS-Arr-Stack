@@ -109,7 +109,7 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 # Parse with python3 — outputs: HASH|CATEGORY|SAVE_PATH|NAME (one per line)
-TORRENT_LIST=$(python3 - <<'PYEOF'
+TORRENT_LIST=$(echo "$RAW" | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 for t in data:
@@ -118,7 +118,7 @@ for t in data:
     path = t.get("save_path", "")
     name = t.get("name", "")
     print(f"{h}|{cat}|{path}|{name}")
-PYEOF <<< "$RAW")
+')
 
 TOTAL=$(echo "$TORRENT_LIST" | grep -c '|' || true)
 echo "Found $TOTAL torrent(s)."
