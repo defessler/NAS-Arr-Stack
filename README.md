@@ -513,6 +513,13 @@ Gluetun is likely not connected. Check VPN credentials in `.env` and review logs
 docker-compose logs gluetun
 ```
 
+**qBittorrent fails to start after restarting the whole stack?**
+`docker-compose restart` brings all containers up simultaneously and doesn't respect dependency order —
+qBittorrent tries to join Gluetun's network before Gluetun is running. Always use this instead:
+```bash
+docker-compose down && docker-compose up -d
+```
+
 **Old NAS IP references lingering?**
 Search each service's settings for `192.168.1.241` and replace with the container
 hostname from the internal hostnames table below.
@@ -529,11 +536,16 @@ All commands run from `/volume1/docker/media` (the directory containing `docker-
 ```bash
 docker-compose ps                         # Show all containers and their status
 docker-compose up -d                      # Start all containers (or start any that are stopped)
-docker-compose down                       # Stop and remove all containers
-docker-compose restart sonarr             # Restart a single container
+docker-compose down && docker-compose up -d  # Restart the full stack (respects dependency order)
+docker-compose restart sonarr             # Restart a single container (fine for most services)
 docker-compose stop sonarr                # Stop a single container without removing it
-docker-compose start sonarr              # Start a previously stopped container
+docker-compose start sonarr               # Start a previously stopped container
 ```
+
+> **Note:** Use `docker-compose down && docker-compose up -d` to restart the full stack — not `docker-compose restart`.
+> `restart` brings everything back up simultaneously without respecting dependency order, which causes qBittorrent
+> to fail because it tries to join Gluetun's network before Gluetun is ready. `up -d` waits for Gluetun to pass
+> its healthcheck before starting qBittorrent. Restarting individual services with `restart` is fine.
 
 **Updates**
 ```bash
