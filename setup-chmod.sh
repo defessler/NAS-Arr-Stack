@@ -15,7 +15,7 @@ echo "  ✔ $SCRIPT_DIR"
 
 echo ""
 echo "Setting permissions on scripts..."
-for script in setup.sh setup-folders.sh setup-firewall.sh setup-nordvpn.sh setup-chmod.sh; do
+for script in setup.sh setup-chmod.sh setup-folders.sh setup-firewall.sh setup-nordvpn.sh setup-validate.sh post-deploy-validate.sh; do
     if [ -f "$SCRIPT_DIR/$script" ]; then
         chmod 755 "$SCRIPT_DIR/$script"
         echo "  ✔ $script"
