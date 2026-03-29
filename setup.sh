@@ -38,6 +38,7 @@ echo "============================================="
 
 run_step 1 "Create folders and set permissions" "setup-folders.sh"
 run_step 2 "Apply firewall rules"               "setup-firewall.sh"
+run_step 3 "Fetch NordVPN WireGuard key"        "setup-nordvpn.sh"
 
 echo ""
 echo "============================================="
