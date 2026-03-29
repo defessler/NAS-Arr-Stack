@@ -155,7 +155,7 @@ services:
       - WIREGUARD_PRIVATE_KEY=${NORDVPN_PRIVATE_KEY}
       - SERVER_COUNTRIES=${VPN_COUNTRIES}
     ports:
-      - ${LAN_IP}:49156:49156
+      - ${LAN_IP}:49156:8080
       - 6881:6881
       - 6881:6881/udp
     healthcheck:
@@ -177,7 +177,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - WEBUI_PORT=49156
+      - WEBUI_PORT=8080
       - WEBUI_USERNAME=${QBITTORRENT_USER:-admin}
       - WEBUI_PASSWORD=${QBITTORRENT_PASS}
     volumes:
