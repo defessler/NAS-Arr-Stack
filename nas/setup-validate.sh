@@ -82,11 +82,16 @@ else
 fi
 
 # Validate WireGuard key length (should be 44 chars)
+# NordVPN's API sometimes returns 43 chars (missing trailing =) — auto-fix it.
 WG_KEY=$(env_val "NORDVPN_PRIVATE_KEY")
 if [ -n "$WG_KEY" ]; then
     KEY_LEN=${#WG_KEY}
     if [ "$KEY_LEN" -eq 44 ]; then
         ok "NORDVPN_PRIVATE_KEY length looks correct (44 chars)"
+    elif [ "$KEY_LEN" -eq 43 ]; then
+        PADDED_KEY="${WG_KEY}="
+        sed -i "s|NORDVPN_PRIVATE_KEY=.*|NORDVPN_PRIVATE_KEY=$PADDED_KEY|" "$ENV_FILE"
+        ok "NORDVPN_PRIVATE_KEY was 43 chars — padded to 44 automatically (added trailing =)"
     else
         fail "NORDVPN_PRIVATE_KEY length is $KEY_LEN — expected 44. Run setup-nordvpn.sh"
     fi
