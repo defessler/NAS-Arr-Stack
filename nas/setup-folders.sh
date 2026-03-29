@@ -110,14 +110,14 @@ if [ -z "$HASH" ]; then
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-    printf '[LegalNotice]\nAccepted=true\n\n[Preferences]\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
+    printf '[LegalNotice]\nAccepted=true\n\n[BitTorrent]\nSession\DefaultSavePath=/data/Downloads/Torrents/InProgress\nSession\TempPath=/data/Downloads/Torrents/InProgress\n\n[Preferences]\nDownloads\SavePath=/data/Downloads/Torrents/InProgress\nDownloads\TempPath=/data/Downloads/Torrents/InProgress\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
         "$USERNAME" "$HASH" > "$CONF_FILE"
 else
     printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\AuthSubnetWhitelistEnabled=true\nWebUI\\AuthSubnetWhitelist=192.168.1.0/24\n' \
         "$USERNAME" "$HASH" >> "$CONF_FILE"
 fi
 
-echo "[init] qBittorrent WebUI credentials configured (user: $USERNAME)"
+echo "[init] qBittorrent WebUI credentials and download paths configured (user: $USERNAME)"
 INITEOF
 chown $PUID:$PGID "$INIT_DST"
 chmod 755 "$INIT_DST"
