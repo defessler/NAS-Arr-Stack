@@ -109,10 +109,10 @@ if [ -z "$HASH" ]; then
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-    printf '[LegalNotice]\nAccepted=true\n\n[Preferences]\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\n' \
+    printf '[LegalNotice]\nAccepted=true\n\n[Preferences]\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\HostHeaderValidation=false\n' \
         "$USERNAME" "$HASH" > "$CONF_FILE"
 else
-    printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\n' \
+    printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\nWebUI\\HostHeaderValidation=false\n' \
         "$USERNAME" "$HASH" >> "$CONF_FILE"
 fi
 
