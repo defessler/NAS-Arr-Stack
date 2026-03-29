@@ -70,17 +70,57 @@ for dir in "${DATA_DIRS[@]}"; do
 done
 
 echo ""
-echo "Deploying qBittorrent init script..."
-INIT_SRC="$SCRIPT_DIR/qbittorrent-init.sh"
+echo "Deploying qBittorrent credential init script..."
 INIT_DST="/volume1/docker/media/qbittorrent/custom-cont-init.d/set-credentials.sh"
-if [ -f "$INIT_SRC" ]; then
-    cp "$INIT_SRC" "$INIT_DST"
-    chown $PUID:$PGID "$INIT_DST"
-    chmod 755 "$INIT_DST"
-    echo "  Deployed: $INIT_DST"
-else
-    echo "  ⚠ qbittorrent-init.sh not found — skipping credential init setup"
+cat > "$INIT_DST" << 'INITEOF'
+#!/bin/bash
+# Sets qBittorrent WebUI credentials from environment variables.
+# Runs inside the container at startup via /custom-cont-init.d.
+# Only sets credentials on first boot — skips if already configured.
+
+[ -z "$WEBUI_PASSWORD" ] && exit 0
+
+CONF_DIR="/config/qBittorrent"
+CONF_FILE="$CONF_DIR/qBittorrent.conf"
+
+mkdir -p "$CONF_DIR"
+
+# Don't overwrite credentials that have already been configured
+if grep -q "Password_PBKDF2" "$CONF_FILE" 2>/dev/null; then
+    echo "[init] qBittorrent credentials already set — skipping"
+    exit 0
 fi
+
+USERNAME="${WEBUI_USERNAME:-admin}"
+
+# Generate PBKDF2-HMAC-SHA512 hash — qBittorrent's WebUI password format
+HASH=$(python3 <<'PYEOF'
+import hashlib, os, base64
+password = os.environ.get('WEBUI_PASSWORD', '').encode('utf-8')
+salt = os.urandom(16)
+key = hashlib.pbkdf2_hmac('sha512', password, salt, 100000)
+print('@ByteArray(' + base64.b64encode(salt).decode() + ':' + base64.b64encode(key).decode() + ')')
+PYEOF
+)
+
+if [ -z "$HASH" ]; then
+    echo "[init] WARNING: failed to generate password hash — credentials not set"
+    exit 1
+fi
+
+if [ ! -f "$CONF_FILE" ]; then
+    printf '[LegalNotice]\nAccepted=true\n\n[Preferences]\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\n' \
+        "$USERNAME" "$HASH" > "$CONF_FILE"
+else
+    printf '\nWebUI\\Username=%s\nWebUI\\Password_PBKDF2="%s"\n' \
+        "$USERNAME" "$HASH" >> "$CONF_FILE"
+fi
+
+echo "[init] qBittorrent WebUI credentials configured (user: $USERNAME)"
+INITEOF
+chown $PUID:$PGID "$INIT_DST"
+chmod 755 "$INIT_DST"
+echo "  Deployed: $INIT_DST"
 
 echo ""
 echo "Done. All folders are ready."
