@@ -22,6 +22,7 @@ CONFIG_DIRS=(
     /volume1/docker/media/bazarr/config
     /volume1/docker/media/lidarr/config
     /volume1/docker/media/qbittorrent/config
+    /volume1/docker/media/qbittorrent/config/.cache/qBittorrent
     /volume1/docker/media/sabnzbd/config
     /volume1/docker/media/sabnzbd/Downloads/incomplete
     /volume1/docker/media/recyclarr/config
