@@ -445,18 +445,52 @@ hostname from the internal hostnames table below.
 
 ## Quick Reference
 
-### Docker Compose Commands
+### Docker Compose Cheatsheet
 
-All commands run from the directory containing `docker-compose.yml`:
+All commands run from `/volume1/docker/media` (the directory containing `docker-compose.yml`).
 
+**Everyday**
 ```bash
-docker-compose up -d              # Start all containers
-docker-compose down               # Stop all containers
-docker-compose pull               # Download latest images
-docker-compose up -d              # Apply updates after pulling
-docker-compose logs -f sonarr     # Watch logs for one service
-docker-compose restart sonarr     # Restart one service
-docker-compose ps                 # See what's running
+docker-compose ps                         # Show all containers and their status
+docker-compose up -d                      # Start all containers (or start any that are stopped)
+docker-compose down                       # Stop and remove all containers
+docker-compose restart sonarr             # Restart a single container
+docker-compose stop sonarr                # Stop a single container without removing it
+docker-compose start sonarr              # Start a previously stopped container
+```
+
+**Updates**
+```bash
+docker-compose pull                       # Download latest images for all services
+docker-compose pull sonarr                # Download latest image for one service
+docker-compose up -d                      # Recreate containers that have a newer image
+docker-compose up -d sonarr              # Update and recreate one container only
+```
+
+**Logs**
+```bash
+docker-compose logs sonarr                # Show recent logs for a service
+docker-compose logs -f sonarr             # Stream live logs (Ctrl+C to stop)
+docker-compose logs -f sonarr radarr      # Stream logs for multiple services
+docker-compose logs --tail=50 sonarr      # Show last 50 lines only
+docker-compose logs -f                    # Stream logs for all services
+```
+
+**Debugging**
+```bash
+docker-compose exec sonarr bash          # Open a shell inside a running container
+docker exec gluetun wget -qO- https://ipinfo.io   # Check Gluetun's external IP
+docker stats                              # Live CPU/memory usage for all containers
+docker-compose config                     # Print the resolved compose config (with .env applied)
+docker inspect sonarr                     # Full container details (mounts, network, env vars)
+docker system df                          # Show disk usage by images, containers, volumes
+```
+
+**Cleanup**
+```bash
+docker image prune                        # Remove unused images
+docker image prune -a                     # Remove all images not used by a running container
+docker system prune                       # Remove stopped containers, unused networks, dangling images
 ```
 
 ### Service URLs
