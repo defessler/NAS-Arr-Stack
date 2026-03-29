@@ -32,6 +32,10 @@ Most of this stack is automated, but some things require human action. Here's ev
 - [ ] Migrate Plex data from the native package (Step 4)
 
 ### After first boot
+- [ ] Change default credentials in qBittorrent and SABnzbd (Security)
+- [ ] Enable authentication in Prowlarr and Bazarr (Security)
+- [ ] Restrict .env permissions: `chmod 600 /volume1/docker/media/.env` (Security)
+- [ ] Harden SSH — disable password auth, use key-only (Security)
 - [ ] Update root folder paths in Sonarr, Radarr, and Lidarr (Step 9)
 - [ ] Set download client paths in qBittorrent and SABnzbd (Step 9)
 - [ ] Connect Sonarr/Radarr/Lidarr to qBittorrent and SABnzbd as download clients (Step 9)
@@ -373,6 +377,64 @@ docker-compose logs gluetun
 4. Trigger a manual download via usenet — verify SABnzbd + import works
 5. Check Plex sees newly imported media
 6. Try requesting something through Seerr
+
+---
+
+## Security
+
+### Do immediately after first boot
+
+**Change default credentials**
+Both qBittorrent and SABnzbd ship with known default logins — change these before anything else.
+- qBittorrent → Settings → WebUI → change username and password
+- SABnzbd → Settings → General → set username and password
+
+**Enable authentication on Prowlarr and Bazarr**
+These have no login by default.
+- Prowlarr → Settings → General → Authentication → set username and password
+- Bazarr → Settings → General → Authentication → set username and password
+
+**Restrict .env file permissions**
+The `.env` file contains your API keys and NordVPN private key. Lock it down:
+```bash
+chmod 600 /volume1/docker/media/.env
+```
+
+**Harden SSH on the NAS**
+Use key-based auth and disable password login:
+Synology DSM → Control Panel → Terminal & SNMP → Enable SSH, then:
+```bash
+# On the NAS — disable password auth
+sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo synoservicectl --reload sshd
+```
+Make sure you have your SSH key set up before doing this or you'll lock yourself out.
+
+---
+
+### Known open ports
+
+| Port | Service | Accessible from |
+|------|---------|----------------|
+| 32400 | Plex | LAN only |
+| 5056 | Seerr | LAN only |
+| 8181 | Tautulli | LAN only |
+| 49150-49156 | *arr apps + download clients | LAN only |
+| **6881** | **qBittorrent peers (via Gluetun)** | **Internet — intentional** |
+
+Port 6881 is the only port exposed to the internet. It routes through Gluetun so peer traffic never touches your real IP, but it is a fully open inbound port. If you stop using torrents you can remove it from the compose file and firewall script.
+
+---
+
+### Keeping containers updated
+
+`latest` tags mean you control updates — they won't happen automatically. Run this periodically to pull new images and restart changed containers:
+```bash
+cd /volume1/docker/media
+docker-compose pull
+docker-compose up -d
+```
+Check the linuxserver.io blog and Seerr/Recyclarr release notes occasionally for anything requiring manual action on upgrade.
 
 ---
 
