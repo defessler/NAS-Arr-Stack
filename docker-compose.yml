@@ -5,13 +5,15 @@ services:
   plex:
     image: linuxserver/plex:latest
     container_name: plex
-    network_mode: host
+    networks: [media]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - VERSION=docker
       - PLEX_CLAIM=${PLEX_CLAIM}
+    ports:
+      - ${LAN_IP}:32400:32400
     volumes:
       - /volume1/docker/media/plex/config:/config
       - /volume1/Data/Media/Movies:/movies
@@ -27,28 +29,36 @@ services:
     image: linuxserver/tautulli:latest
     container_name: tautulli
     networks: [media]
+    depends_on: [plex]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 8181:8181
+      - ${LAN_IP}:8181:8181
     volumes:
       - /volume1/docker/media/tautulli/config:/config
     restart: unless-stopped
 
-  overseerr:
-    image: linuxserver/overseerr:latest
-    container_name: overseerr
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    init: true
+    user: "${PUID}:${PGID}"
     networks: [media]
+    depends_on: [plex]
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 5055:5055
+      - ${LAN_IP}:5056:5055
     volumes:
-      - /volume1/docker/media/overseerr/config:/config
+      - /volume1/docker/media/seerr/config:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
     restart: unless-stopped
 
   # ── Indexer / Management ──────────────────────────────────
@@ -62,7 +72,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 49150:9696
+      - ${LAN_IP}:49150:9696
     volumes:
       - /volume1/docker/media/prowlarr/config:/config
     restart: unless-stopped
@@ -71,12 +81,13 @@ services:
     image: linuxserver/sonarr:latest
     container_name: sonarr
     networks: [media]
+    depends_on: [prowlarr]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 49152:8989
+      - ${LAN_IP}:49152:8989
     volumes:
       - /volume1/docker/media/sonarr/config:/config
       - /volume1/Data:/data
@@ -86,12 +97,13 @@ services:
     image: linuxserver/radarr:latest
     container_name: radarr
     networks: [media]
+    depends_on: [prowlarr]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 49151:7878
+      - ${LAN_IP}:49151:7878
     volumes:
       - /volume1/docker/media/radarr/config:/config
       - /volume1/Data:/data
@@ -101,32 +113,64 @@ services:
     image: linuxserver/bazarr:latest
     container_name: bazarr
     networks: [media]
+    depends_on: [sonarr, radarr]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 49153:6767
+      - ${LAN_IP}:49153:6767
     volumes:
       - /volume1/docker/media/bazarr/config:/config
       - /volume1/Data:/data
     restart: unless-stopped
 
+  lidarr:
+    image: linuxserver/lidarr:latest
+    container_name: lidarr
+    networks: [media]
+    depends_on: [prowlarr]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - ${LAN_IP}:49154:8686
+    volumes:
+      - /volume1/docker/media/lidarr/config:/config
+      - /volume1/Data:/data
+    restart: unless-stopped
+
   # ── Download Clients ──────────────────────────────────────
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    networks: [media]
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE}
+      - WIREGUARD_PRIVATE_KEY=${VPN_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=${VPN_ADDRESSES}
+      - SERVER_COUNTRIES=${VPN_COUNTRIES}
+    ports:
+      - ${LAN_IP}:49156:8080
+      - 6881:6881
+      - 6881:6881/udp
+    restart: unless-stopped
 
   qbittorrent:
     image: linuxserver/qbittorrent:latest
     container_name: qbittorrent
-    networks: [media]
+    network_mode: "service:gluetun"
+    depends_on: [gluetun]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - WEBUI_PORT=8080
-    ports:
-      - 49156:8080
-      - 6881:6881
-      - 6881:6881/udp
     volumes:
       - /volume1/docker/media/qbittorrent/config:/config
       - /volume1/Data:/data
@@ -141,17 +185,31 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     ports:
-      - 49155:8080
+      - ${LAN_IP}:49155:8080
     volumes:
       - /volume1/docker/media/sabnzbd/config:/config
       - /volume1/Data:/data
       - /volume1/docker/media/sabnzbd/Downloads/incomplete:/incomplete-downloads
     restart: unless-stopped
 
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    user: "${PUID}:${PGID}"
+    networks: [media]
+    depends_on: [sonarr, radarr]
+    environment:
+      - TZ=${TZ}
+      - RECYCLARR_CREATE_CONFIG=true
+    volumes:
+      - /volume1/docker/media/recyclarr/config:/config
+    restart: unless-stopped
+
   unpackerr:
     image: golift/unpackerr:latest
     container_name: unpackerr
     networks: [media]
+    depends_on: [sonarr, radarr]
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
