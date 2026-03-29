@@ -28,7 +28,7 @@ Most of this stack is automated, but some things require human action. Here's ev
 - [ ] Get a Plex claim token from https://plex.tv/claim (wait until right before `docker-compose up`)
 - [ ] Fill in the `.env` file with all values (Step 2)
 - [ ] Create config directories on the NAS (Step 3)
-- [ ] Fix file ownership for Seerr config dir: `chown -R 1000:1000 /volume1/docker/media/seerr`
+- [ ] Fix file ownership for Seerr config dir: `chown -R 1034:100 /volume1/docker/media/seerr`
 - [ ] Migrate Plex data from the native package (Step 4)
 
 ### After first boot
@@ -41,22 +41,13 @@ Most of this stack is automated, but some things require human action. Here's ev
 - [ ] Edit Recyclarr config at `/volume1/docker/media/recyclarr/config/recyclarr.yml` with API keys and desired quality profiles (Step 13)
 - [ ] Verify Gluetun VPN is working before downloading anything (Step 13)
 
-### Getting WireGuard credentials from your VPN provider
-Each provider is different. Common ones:
-- **Mullvad** — Account → WireGuard configuration → Generate key → download config file
-- **ProtonVPN** — Downloads → WireGuard configuration → create config
-- **AirVPN** — Client Area → Config Generator → WireGuard
+### Getting your NordVPN WireGuard private key
+1. Log in at https://my.nordaccount.com
+2. Go to **NordVPN → Manual configuration → Service credentials**
+3. Under the WireGuard section, generate a key pair
+4. Copy the **Private Key** — that's your `NORDVPN_PRIVATE_KEY`
 
-From the downloaded `.conf` file, map the values to `.env`:
-```
-[Interface]
-PrivateKey = abc123...    → VPN_PRIVATE_KEY=abc123...
-Address = 10.x.x.x/32    → VPN_ADDRESSES=10.x.x.x/32
-
-[Peer]
-...
-```
-Set `VPN_COUNTRIES` to any country the provider supports (e.g. `Switzerland`, `Netherlands`).
+NordVPN handles the server addresses automatically, so no `VPN_ADDRESSES` is needed.
 
 ---
 
@@ -108,12 +99,9 @@ PLEX_CLAIM=                # from https://plex.tv/claim (expires in 4 min — fi
 SONARR_API_KEY=            # from Sonarr → Settings → General
 RADARR_API_KEY=            # from Radarr → Settings → General
 
-# Gluetun VPN — values depend on your VPN provider
-VPN_PROVIDER=              # e.g. mullvad, protonvpn, nordvpn, airvpn
-VPN_TYPE=wireguard         # or openvpn
-VPN_PRIVATE_KEY=           # WireGuard private key from your VPN provider
-VPN_ADDRESSES=             # WireGuard address e.g. 10.x.x.x/32
-VPN_COUNTRIES=             # e.g. Switzerland
+# Gluetun VPN (NordVPN)
+NORDVPN_PRIVATE_KEY=       # from my.nordaccount.com → NordVPN → Manual config → WireGuard
+VPN_COUNTRIES=             # e.g. United States, Netherlands, Switzerland
 ```
 
 Save and exit (`Ctrl+X`, `Y`, `Enter`).
@@ -162,9 +150,9 @@ chown -R 1034:100 /volume1/docker/media/sabnzbd
 chown -R 1034:100 /volume1/Data/Downloads/Usenet
 ```
 
-Seerr runs as UID 1000 (fixed by the image — not configurable):
+Seerr config dir needs the same ownership as everything else:
 ```bash
-chown -R 1000:1000 /volume1/docker/media/seerr
+chown -R 1034:100 /volume1/docker/media/seerr
 ```
 
 ## Step 6: Get a Plex claim token
