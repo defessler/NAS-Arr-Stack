@@ -96,19 +96,16 @@ remove_rules() {
 }
 
 case "$1" in
-    start)
-        echo "Adding media stack firewall rules..."
-        add_rules
-        echo "Done."
-        ;;
     stop)
         echo "Removing media stack firewall rules..."
         remove_rules
         echo "Done."
         ;;
     *)
-        # Default to start (Synology calls scripts without arguments on boot)
-        echo "Adding media stack firewall rules..."
+        # Default to start (covers both explicit 'start' and boot — Synology calls without args)
+        # Always remove first so re-running never creates duplicate rules
+        echo "Applying media stack firewall rules..."
+        remove_rules
         add_rules
         echo "Done."
         ;;
