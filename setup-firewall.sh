@@ -21,19 +21,17 @@ add_rules() {
     # SSH
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 22 -j ACCEPT
 
-    # Plex
+    # Plex (bridge network — port 32400 only, no discovery ports needed)
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 32400 -j ACCEPT
-    iptables -I INPUT -s $LOCAL_SUBNET -p udp --dport 1900 -j ACCEPT
-    iptables -I INPUT -s $LOCAL_SUBNET -p udp --dport 5353 -j ACCEPT
-    iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 8324 -j ACCEPT
-    iptables -I INPUT -s $LOCAL_SUBNET -p udp --dport 32410:32414 -j ACCEPT
-    iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 32469 -j ACCEPT
 
     # Sonarr
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49152 -j ACCEPT
 
     # Radarr
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49151 -j ACCEPT
+
+    # Lidarr
+    iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49154 -j ACCEPT
 
     # Prowlarr
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49150 -j ACCEPT
@@ -44,13 +42,13 @@ add_rules() {
     # SABnzbd
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49155 -j ACCEPT
 
-    # qBittorrent
+    # qBittorrent (via Gluetun)
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 49156 -j ACCEPT
     iptables -I INPUT -p tcp --dport 6881 -j ACCEPT
     iptables -I INPUT -p udp --dport 6881 -j ACCEPT
 
-    # Overseerr
-    iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 5055 -j ACCEPT
+    # Seerr
+    iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 5056 -j ACCEPT
 
     # Tautulli
     iptables -I INPUT -s $LOCAL_SUBNET -p tcp --dport 8181 -j ACCEPT
@@ -66,17 +64,15 @@ remove_rules() {
 
     # Plex
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 32400 -j ACCEPT 2>/dev/null
-    iptables -D INPUT -s $LOCAL_SUBNET -p udp --dport 1900 -j ACCEPT 2>/dev/null
-    iptables -D INPUT -s $LOCAL_SUBNET -p udp --dport 5353 -j ACCEPT 2>/dev/null
-    iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 8324 -j ACCEPT 2>/dev/null
-    iptables -D INPUT -s $LOCAL_SUBNET -p udp --dport 32410:32414 -j ACCEPT 2>/dev/null
-    iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 32469 -j ACCEPT 2>/dev/null
 
     # Sonarr
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49152 -j ACCEPT 2>/dev/null
 
     # Radarr
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49151 -j ACCEPT 2>/dev/null
+
+    # Lidarr
+    iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49154 -j ACCEPT 2>/dev/null
 
     # Prowlarr
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49150 -j ACCEPT 2>/dev/null
@@ -87,13 +83,13 @@ remove_rules() {
     # SABnzbd
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49155 -j ACCEPT 2>/dev/null
 
-    # qBittorrent
+    # qBittorrent (via Gluetun)
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 49156 -j ACCEPT 2>/dev/null
     iptables -D INPUT -p tcp --dport 6881 -j ACCEPT 2>/dev/null
     iptables -D INPUT -p udp --dport 6881 -j ACCEPT 2>/dev/null
 
-    # Overseerr
-    iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 5055 -j ACCEPT 2>/dev/null
+    # Seerr
+    iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 5056 -j ACCEPT 2>/dev/null
 
     # Tautulli
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 8181 -j ACCEPT 2>/dev/null
