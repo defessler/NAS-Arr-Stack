@@ -57,7 +57,7 @@ check_url() {
     local url="$2"
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
-    if [[ "$http_code" =~ ^(200|301|302|303|401|403)$ ]]; then
+    if [[ "$http_code" =~ ^(200|301|302|303|307|308|401|403)$ ]]; then
         ok "$label ($url) — HTTP $http_code"
     else
         fail "$label ($url) — HTTP $http_code (not reachable)"
@@ -128,7 +128,7 @@ check_media() {
     else
         warn "$label — no items found ($container:$path) — folder may be empty or not mounted"
     fi
-done
+}
 
 check_media "sonarr"  "/data/Media/TV Shows"    "TV Shows"
 check_media "sonarr"  "/data/Media/Anime/TV Shows" "Anime TV"
