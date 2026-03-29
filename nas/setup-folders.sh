@@ -7,8 +7,17 @@
 # Usage:
 #   sudo bash /volume1/docker/media/setup-folders.sh
 
-PUID=1034
-PGID=100
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+
+# Read PUID/PGID from .env, fall back to safe defaults
+PUID=$(grep -m1 '^PUID=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-)
+PGID=$(grep -m1 '^PGID=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-)
+PUID="${PUID:-1034}"
+PGID="${PGID:-100}"
+
+echo "Using PUID=$PUID PGID=$PGID (from ${ENV_FILE})"
+echo ""
 
 # ── Config directories ─────────────────────────────────────────────────────────
 
