@@ -45,7 +45,20 @@ fi
 
 echo "  ✔ Private key retrieved."
 
+# WireGuard private keys are 32 bytes = 44 base64 chars with padding.
+# NordVPN's API sometimes returns 43 chars (missing trailing =). Pad it.
+if [ ${#PRIVATE_KEY} -eq 43 ]; then
+    PRIVATE_KEY="${PRIVATE_KEY}="
+    echo "  ℹ Key was 43 chars — padded to 44 (NordVPN API omits trailing = on some accounts)"
+fi
+
+KEY_LEN=${#PRIVATE_KEY}
+if [ "$KEY_LEN" -ne 44 ]; then
+    echo "  ✘ Key length is $KEY_LEN — expected 44. The API may have returned an unexpected format."
+    exit 1
+fi
+
 # Update NORDVPN_PRIVATE_KEY in .env
 sed -i "s|NORDVPN_PRIVATE_KEY=.*|NORDVPN_PRIVATE_KEY=$PRIVATE_KEY|" "$ENV_FILE"
 
-echo "  ✔ .env updated with private key."
+echo "  ✔ .env updated with private key (44 chars)."

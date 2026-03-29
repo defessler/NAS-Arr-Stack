@@ -72,8 +72,7 @@ Most of this stack is automated, but some things require human action. Here's ev
 - [ ] Get a Plex claim token from https://plex.tv/claim (wait until right before `docker-compose up`)
 - [ ] Copy all repo files to the NAS (Step 1)
 - [ ] Fill in the `.env` file with all values (Step 2)
-- [ ] Run `setup.sh` to create folders, set permissions, and apply firewall rules (Step 3)
-- [ ] Install firewall script to survive reboots (Step 4)
+- [ ] Run `setup.sh` to create folders, set permissions, apply firewall rules, and install them to survive reboots (Steps 3–4)
 - [ ] Migrate Plex data from the native package (Step 5)
 
 ### After first boot
@@ -164,13 +163,9 @@ Each step prints `Created` or `Exists` for every folder, then confirms the firew
 
 ## Step 4: Install the firewall script to survive reboots
 
-Synology doesn't persist iptables rules across reboots. This installs the firewall script so it runs automatically on every boot:
-```bash
-sudo cp /volume1/docker/media/setup-firewall.sh /usr/local/etc/rc.d/media-firewall.sh
-sudo chmod 755 /usr/local/etc/rc.d/media-firewall.sh
-```
+This is handled automatically by `setup.sh` — when `setup-firewall.sh` applies iptables rules, it also copies itself to `/usr/local/etc/rc.d/media-firewall.sh` so Synology re-applies the rules on every boot. No manual action needed.
 
-Only needs to be done once. If you update `setup-firewall.sh` later, re-run these two commands to copy the new version.
+If you ever update `setup-firewall.sh`, just re-run `setup.sh` (or `sudo bash setup-firewall.sh` directly) and it will copy the new version to rc.d automatically.
 
 ## Step 5: Migrate Plex data from native app
 

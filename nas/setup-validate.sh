@@ -142,8 +142,9 @@ section "Firewall"
 check_port() {
     local port="$1"
     local label="$2"
-    if iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
-       iptables -C INPUT -s 192.168.0.0/16 -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
+    # Use iptables -L to list rules and grep for the port number.
+    # This works regardless of which source subnet the rule uses.
+    if iptables -L INPUT -n 2>/dev/null | grep -q "dpt:$port"; then
         ok "Port $port open ($label)"
     else
         fail "Port $port not in iptables ($label) — run setup-firewall.sh"

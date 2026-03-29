@@ -95,6 +95,20 @@ remove_rules() {
     iptables -D INPUT -s $LOCAL_SUBNET -p tcp --dport 8181 -j ACCEPT 2>/dev/null
 }
 
+RC_SCRIPT=/usr/local/etc/rc.d/media-firewall.sh
+
+install_to_rcd() {
+    local source
+    source="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+    if [ ! -f "$RC_SCRIPT" ] || ! diff -q "$source" "$RC_SCRIPT" &>/dev/null; then
+        cp "$source" "$RC_SCRIPT"
+        chmod 755 "$RC_SCRIPT"
+        echo "  ✔ Installed to $RC_SCRIPT (rules will apply on every reboot)"
+    else
+        echo "  ✔ rc.d script already up to date"
+    fi
+}
+
 case "$1" in
     stop)
         echo "Removing media stack firewall rules..."
@@ -107,6 +121,9 @@ case "$1" in
         echo "Applying media stack firewall rules..."
         remove_rules
         add_rules
-        echo "Done."
+        echo "  ✔ Firewall rules applied."
+
+        # Also install to rc.d so rules survive reboots (idempotent — safe to re-run)
+        install_to_rcd
         ;;
 esac
