@@ -36,9 +36,10 @@ echo "============================================="
 echo "  Media Stack Setup"
 echo "============================================="
 
-run_step 1 "Create folders and set permissions" "setup-folders.sh"
-run_step 2 "Apply firewall rules"               "setup-firewall.sh"
-run_step 3 "Fetch NordVPN WireGuard key"        "setup-nordvpn.sh"
+run_step 1 "Set file permissions"               "setup-chmod.sh"
+run_step 2 "Create folders and set permissions" "setup-folders.sh"
+run_step 3 "Apply firewall rules"               "setup-firewall.sh"
+run_step 4 "Fetch NordVPN WireGuard key"        "setup-nordvpn.sh"
 
 echo ""
 echo "============================================="
