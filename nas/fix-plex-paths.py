@@ -2,19 +2,23 @@
 """
 fix-plex-paths.py — Update Plex library folder paths
 
-Updates library folder locations after the Plex volume mount changed
-from individual folders to a single /media mount.
+Updates library folder locations after migrating from the native Plex
+package to Docker. The native package stored NAS host paths in its
+database; the Docker container now mounts /volume1/Data/Media at /media.
 
-Old mounts:
-    /volume1/Data/Media/Movies       → /movies
-    /volume1/Data/Media/TV Shows     → /tv/shows
-    /volume1/Data/Media/Anime/Movies → /anime/movies
-    /volume1/Data/Media/Anime/TV     → /anime/tv
-    /volume1/Data/Media/Music        → /music  (if it was mounted)
+Old paths (from native Plex package / host filesystem):
+    /volume1/Data/Media/Movies
+    /volume1/Data/Media/TV Shows
+    /volume1/Data/Media/Anime/Movies
+    /volume1/Data/Media/Anime/TV Shows
+    /volume1/Data/Media/Music
 
-New mount:
-    /volume1/Data/Media              → /media
-    So paths become /media/Movies, /media/TV Shows, etc.
+New paths (inside the Docker container via /media mount):
+    /media/Movies
+    /media/TV Shows
+    /media/Anime/Movies
+    /media/Anime/TV Shows
+    /media/Music
 
 Usage:
     python3 fix-plex-paths.py           # dry run — shows what would change
@@ -37,13 +41,13 @@ PREFS_PATH = ("/volume1/docker/media/plex/config"
               "/Library/Application Support"
               "/Plex Media Server/Preferences.xml")
 
-# Old container path → new container path
+# Old NAS host path (from native Plex package) → new container path (/media mount)
 PATH_MAP = {
-    "/movies":       "/media/Movies",
-    "/tv/shows":     "/media/TV Shows",
-    "/anime/movies": "/media/Anime/Movies",
-    "/anime/tv":     "/media/Anime/TV Shows",
-    "/music":        "/media/Music",
+    "/volume1/Data/Media/Movies":         "/media/Movies",
+    "/volume1/Data/Media/TV Shows":       "/media/TV Shows",
+    "/volume1/Data/Media/Anime/Movies":   "/media/Anime/Movies",
+    "/volume1/Data/Media/Anime/TV Shows": "/media/Anime/TV Shows",
+    "/volume1/Data/Media/Music":          "/media/Music",
 }
 
 # ── Colours ───────────────────────────────────────────────────────────────────
