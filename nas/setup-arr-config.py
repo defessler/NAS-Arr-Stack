@@ -361,18 +361,19 @@ def configure_sabnzbd(base, key, ini_path):
         fail(f"{label}: failed to set {value}")
         return False
 
-    # Clear host_whitelist so other Docker containers can connect to SABnzbd.
-    # By default SABnzbd only accepts connections from its own hostname, which
-    # blocks Sonarr/Radarr/Lidarr trying to reach http://sabnzbd:8080.
+    # Add all service hostnames to host_whitelist so Docker containers can reach
+    # SABnzbd. Setting it to '' stores [''] (non-empty list) not [] (empty list),
+    # so SABnzbd still blocks everything. Explicit hostnames are more reliable.
+    WHITELIST = 'sabnzbd,sonarr,radarr,lidarr,bazarr,prowlarr,localhost,127.0.0.1'
     result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
-                                  'keyword': 'host_whitelist', 'value': ''})
+                                  'keyword': 'host_whitelist', 'value': WHITELIST})
     if result is not None and result.get('status') is not False:
-        ok("Host whitelist cleared (allows Docker containers to connect)")
-    elif sabnzbd_ini_set(ini_path, 'host_whitelist', ''):
-        ok("Host whitelist cleared  (ini edit — SABnzbd restart needed)")
+        ok("Host whitelist updated (Docker service hostnames allowed)")
+    elif sabnzbd_ini_set(ini_path, 'host_whitelist', WHITELIST):
+        ok("Host whitelist updated  (ini edit — SABnzbd restart needed)")
         ini_modified = True
     else:
-        warn("Could not clear host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
+        warn("Could not update host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
 
     # Download directories
     for label, keyword, value in [
@@ -719,8 +720,8 @@ def main():
         lidarr_meta_profiles = GET(LIDARR, LIDARR_KEY, "/api/v1/metadataprofile") or []
         lidarr_meta_id = lidarr_meta_profiles[0]['id'] if lidarr_meta_profiles else 1
         add_root_folder(LIDARR, LIDARR_KEY, "api/v1", "/data/Media/Music", {
-            "qualityProfileId":  lidarr_quality_id or 1,
-            "metadataProfileId": lidarr_meta_id,
+            "defaultQualityProfileId":  lidarr_quality_id or 1,
+            "defaultMetadataProfileId": lidarr_meta_id,
         })
         add_download_client(LIDARR, LIDARR_KEY, "api/v1", "qBittorrent", "QBittorrent", {
             "host": QB_HOST, "port": QB_PORT, "useSsl": False,
