@@ -111,23 +111,48 @@ def _request(url, headers, method='GET', data=None):
             content = resp.read()
             return json.loads(content) if content else {}
     except HTTPError as e:
-        print(f"    HTTP {e.code}: {e.read().decode(errors='replace')[:200]}")
-        return None
+        body_text = e.read().decode(errors='replace')
+        # Expose the status code and body to callers that want to inspect it
+        e._body_text = body_text
+        print(f"    HTTP {e.code}: {body_text[:200]}")
+        raise
     except URLError:
         return None
+
+def _safe_request(url, headers, method='GET', data=None):
+    """Like _request but returns (result_or_None, http_code_or_None)."""
+    body = json.dumps(data).encode() if data is not None else None
+    req = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(req, timeout=15) as resp:
+            content = resp.read()
+            return (json.loads(content) if content else {}), resp.status
+    except HTTPError as e:
+        body_text = e.read().decode(errors='replace')
+        print(f"    HTTP {e.code}: {body_text[:200]}")
+        return None, e.code
+    except URLError:
+        return None, None
 
 def _arr_headers(key):
     return {'X-Api-Key': key, 'Content-Type': 'application/json',
             'User-Agent': 'setup-arr-config/1.0'}
 
 def GET(base, key, path):
-    return _request(f"{base}{path}", _arr_headers(key))
+    result, _ = _safe_request(f"{base}{path}", _arr_headers(key))
+    return result
 
 def POST(base, key, path, data):
-    return _request(f"{base}{path}", _arr_headers(key), 'POST', data)
+    result, _ = _safe_request(f"{base}{path}", _arr_headers(key), 'POST', data)
+    return result
+
+def POST_status(base, key, path, data):
+    """POST that also returns the HTTP status code."""
+    return _safe_request(f"{base}{path}", _arr_headers(key), 'POST', data)
 
 def PUT(base, key, path, data):
-    return _request(f"{base}{path}", _arr_headers(key), 'PUT', data)
+    result, _ = _safe_request(f"{base}{path}", _arr_headers(key), 'PUT', data)
+    return result
 
 def sab_api(base, key, params):
     """SABnzbd uses query-string API, not JSON body."""
@@ -168,7 +193,9 @@ def add_root_folder(base, key, api, path):
         fail(f"Root folder: can't reach API"); return
     if any(f['path'] == path for f in existing):
         skip(f"Root folder: {path}"); return
-    result = POST(base, key, f"/{api}/rootfolder", {"path": path})
+    # Lidarr requires a 'name' field; Sonarr/Radarr accept but ignore it
+    name = os.path.basename(path.rstrip('/')) or path
+    result = POST(base, key, f"/{api}/rootfolder", {"path": path, "name": name})
     ok(f"Root folder: {path}") if result else fail(f"Root folder: {path}")
 
 def add_download_client(base, key, api, name, implementation, field_overrides):
@@ -196,11 +223,18 @@ def add_remote_path_mapping(base, key, api, host, remote, local):
     existing = GET(base, key, f"/{api}/remotePathMapping")
     if existing is None:
         fail("Remote path mapping: can't reach API"); return
-    if any(m.get('host') == host and m.get('remotePath') == remote for m in existing):
-        skip(f"Remote path: {host} {remote} → {local}"); return
-    result = POST(base, key, f"/{api}/remotePathMapping",
-                  {"host": host, "remotePath": remote, "localPath": local})
-    ok(f"Remote path: {host} {remote} → {local}") if result else fail(f"Remote path: {host} {remote} → {local}")
+    # Check by remote path alone — host may be stored differently (e.g. qbittorrent vs gluetun)
+    if any(m.get('remotePath', '').rstrip('/') == remote.rstrip('/') for m in existing):
+        skip(f"Remote path: {remote} → {local}"); return
+    result, status = POST_status(base, key, f"/{api}/remotePathMapping",
+                                 {"host": host, "remotePath": remote, "localPath": local})
+    if result is not None:
+        ok(f"Remote path: {host} {remote} → {local}")
+    elif status == 500:
+        # "RemotePath already configured" — treat as already set
+        skip(f"Remote path: {remote} → {local} (already configured)")
+    else:
+        fail(f"Remote path: {host} {remote} → {local}")
 
 def enable_hardlinks(base, key, api):
     config = GET(base, key, f"/{api}/config/mediamanagement")
@@ -277,6 +311,16 @@ def configure_sabnzbd(base, key):
     if not resp:
         fail("Can't reach SABnzbd API"); return
     ok(f"Connected (SABnzbd {resp.get('version', '?')})")
+
+    # Clear host_whitelist so other Docker containers can connect to SABnzbd.
+    # By default SABnzbd only accepts connections from its own hostname, which
+    # blocks Sonarr/Radarr/Lidarr trying to reach http://sabnzbd:8080.
+    result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
+                                  'keyword': 'host_whitelist', 'value': ''})
+    if result and result.get('status'):
+        ok("Host whitelist cleared (allows Docker containers to connect)")
+    else:
+        warn("Could not clear host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
 
     # Download directories
     for label, keyword, value in [
@@ -561,6 +605,10 @@ def main():
         s = f"{GREEN}✔{RESET} {key[:8]}..." if key else f"{RED}✘{RESET} not found"
         print(f"  {name:<12} {s}")
 
+    # ── SABnzbd (configure first so Sonarr/Radarr/Lidarr can connect to it) ────
+
+    configure_sabnzbd(SABNZBD, SABNZBD_KEY)
+
     # ── Sonarr ────────────────────────────────────────────────────────────────
 
     section("Sonarr")
@@ -647,10 +695,6 @@ def main():
             add_prowlarr_app(PROWLARR, PROWLARR_KEY, "Lidarr", "Lidarr",
                              "LidarrSettings", LIDARR_INT, LIDARR_KEY,
                              [3000, 3010, 3030, 3040, 3050])
-
-    # ── SABnzbd ───────────────────────────────────────────────────────────────
-
-    configure_sabnzbd(SABNZBD, SABNZBD_KEY)
 
     # ── Bazarr ────────────────────────────────────────────────────────────────
 
