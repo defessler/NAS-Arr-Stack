@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-fix-plex-paths.py — Update Plex library folder paths
+fix-plex-paths.py — Update Plex library folder paths before first boot
 
-Updates library folder locations after migrating from the native Plex
-package to Docker. The native package stored NAS host paths in its
-database; the Docker container now mounts /volume1/Data/Media at /media.
+Directly edits the Plex SQLite database to update library folder paths.
+Run this BEFORE starting the Plex container — Plex will boot with the
+correct paths already in place, no API or rescan needed.
 
-Old paths (from native Plex package / host filesystem):
+Old paths (stored by native Plex package, host filesystem):
     /volume1/Data/Media/Movies
     /volume1/Data/Media/TV Shows
     /volume1/Data/Media/Anime/Movies
@@ -25,21 +25,18 @@ Usage:
     python3 fix-plex-paths.py --apply   # apply the changes
 """
 
-import json
 import os
+import shutil
+import sqlite3
 import sys
-import xml.etree.ElementTree as ET
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
-from urllib.parse import urlencode, quote
+from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-PLEX_BASE = "http://localhost:32400"
-
-PREFS_PATH = ("/volume1/docker/media/plex/config"
-              "/Library/Application Support"
-              "/Plex Media Server/Preferences.xml")
+DB_PATH = ("/volume1/docker/media/plex/config"
+           "/Library/Application Support"
+           "/Plex Media Server/Plug-in Support/Databases"
+           "/com.plexapp.plugins.library.db")
 
 # Old NAS host path (from native Plex package) → new container path (/media mount)
 PATH_MAP = {
@@ -62,58 +59,6 @@ def ok(msg):   print(f"  {GREEN}✔{RESET}  {msg}")
 def fail(msg): print(f"  {RED}✘{RESET}  {msg}")
 def info(msg): print(f"  {YELLOW}→{RESET}  {msg}")
 
-# ── Plex API helpers ──────────────────────────────────────────────────────────
-
-def plex_headers(token):
-    return {
-        "X-Plex-Token":             token,
-        "X-Plex-Client-Identifier": "fix-plex-paths",
-        "X-Plex-Product":           "fix-plex-paths",
-        "Accept":                   "application/json",
-    }
-
-def plex_get(token, path):
-    req = Request(f"{PLEX_BASE}{path}", headers=plex_headers(token))
-    try:
-        with urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
-    except HTTPError as e:
-        print(f"    HTTP {e.code}: {e.read().decode(errors='replace')[:150]}")
-        return None
-    except Exception as e:
-        print(f"    Error: {e}")
-        return None
-
-def plex_request(token, method, path):
-    req = Request(f"{PLEX_BASE}{path}", headers=plex_headers(token),
-                  method=method)
-    if method == "POST":
-        req.data = b""
-    try:
-        with urlopen(req, timeout=10) as resp:
-            resp.read()
-            return True
-    except HTTPError as e:
-        body = e.read().decode(errors='replace')
-        print(f"    HTTP {e.code}: {body[:150]}")
-        return False
-    except Exception as e:
-        print(f"    Error: {e}")
-        return False
-
-# ── Token ─────────────────────────────────────────────────────────────────────
-
-def read_plex_token(prefs_path):
-    """Read the Plex auth token from Preferences.xml."""
-    try:
-        root = ET.parse(prefs_path).getroot()
-        return root.get("PlexOnlineToken")
-    except FileNotFoundError:
-        return None
-    except Exception as e:
-        print(f"Error reading Preferences.xml: {e}")
-        return None
-
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -122,87 +67,70 @@ def main():
     print(f"\n{BOLD}Plex Library Path Fix{RESET}")
     if not apply:
         print(f"  {YELLOW}Dry run — no changes will be made.{RESET}")
-        print(f"  Re-run with --apply to apply changes.\n")
+        print(f"  Run with --apply to apply.\n")
     else:
         print(f"  {GREEN}Applying changes.{RESET}\n")
 
-    # ── Token ─────────────────────────────────────────────────────────────────
+    # ── Check database exists ─────────────────────────────────────────────────
 
-    token = read_plex_token(PREFS_PATH)
-    if not token:
-        print(f"{RED}Error:{RESET} Could not read Plex token from:")
-        print(f"  {PREFS_PATH}")
-        print("\nMake sure the Plex container is running and has started at least once.")
-        sys.exit(1)
-    print(f"  Token: {token[:8]}...")
-
-    # ── Fetch libraries ───────────────────────────────────────────────────────
-
-    data = plex_get(token, "/library/sections")
-    if not data:
-        print(f"\n{RED}Error:{RESET} Could not reach Plex API at {PLEX_BASE}")
-        print("  Is the Plex container running?")
+    if not os.path.exists(DB_PATH):
+        print(f"{RED}Error:{RESET} Plex database not found at:")
+        print(f"  {DB_PATH}")
+        print("\nMake sure Plex has started at least once to initialise its database.")
         sys.exit(1)
 
-    sections = data.get("MediaContainer", {}).get("Directory", [])
-    if not sections:
-        print("No libraries found.")
-        sys.exit(0)
+    # ── Backup before touching anything ──────────────────────────────────────
+
+    if apply:
+        backup = DB_PATH + ".bak." + datetime.now().strftime("%Y%m%d_%H%M%S")
+        shutil.copy2(DB_PATH, backup)
+        print(f"  Backup: {os.path.basename(backup)}")
+
+    # ── Read current paths ────────────────────────────────────────────────────
+
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+
+    # section_locations holds the folder path for each library
+    cur.execute("SELECT id, root_path FROM section_locations")
+    rows = cur.fetchall()
 
     changes_needed = 0
     changes_done   = 0
 
     print()
-    for section in sections:
-        key       = section["key"]
-        title     = section["title"]
-        lib_type  = section.get("type", "")
-        locations = section.get("Location", [])
+    for row_id, root_path in rows:
+        new_path = PATH_MAP.get(root_path)
+        if new_path:
+            changes_needed += 1
+            info(f"{root_path}")
+            print(f"       → {new_path}")
+            if apply:
+                cur.execute(
+                    "UPDATE section_locations SET root_path = ? WHERE id = ?",
+                    (new_path, row_id)
+                )
+                changes_done += 1
+        else:
+            print(f"  {root_path}  (no change)")
 
-        print(f"{BOLD}{title}{RESET}  (key={key}, type={lib_type})")
+    print()
 
-        for loc in locations:
-            old_path = loc["path"]
-            new_path = PATH_MAP.get(old_path)
-
-            if new_path:
-                changes_needed += 1
-                info(f"{old_path}  →  {new_path}")
-
-                if apply:
-                    # Add the new path first, then remove the old one
-                    add_url  = f"/library/sections/{key}/location?path={quote(new_path, safe='')}"
-                    del_url  = f"/library/sections/{key}/location?path={quote(old_path, safe='')}"
-
-                    if plex_request(token, "POST", add_url):
-                        ok(f"Added   {new_path}")
-                        if plex_request(token, "DELETE", del_url):
-                            ok(f"Removed {old_path}")
-                            changes_done += 1
-                        else:
-                            fail(f"Could not remove old path {old_path} — remove it manually in Plex UI")
-                    else:
-                        fail(f"Could not add {new_path}")
-            else:
-                print(f"         {old_path}  (no change needed)")
-
-        print()
+    if apply and changes_done > 0:
+        con.commit()
+    con.close()
 
     # ── Summary ───────────────────────────────────────────────────────────────
 
     if changes_needed == 0:
         print("All library paths are already correct — nothing to do.")
     elif not apply:
-        print(f"{YELLOW}{changes_needed} path(s) need updating.{RESET}  Re-run with --apply to apply.")
+        print(f"{YELLOW}{changes_needed} path(s) would be updated.{RESET}  Run with --apply to apply.")
     else:
-        if changes_done == changes_needed:
-            print(f"{GREEN}Done — {changes_done} path(s) updated.{RESET}")
-        else:
-            print(f"{YELLOW}Done — {changes_done}/{changes_needed} path(s) updated. Review errors above.{RESET}")
+        ok(f"{changes_done} path(s) updated.")
         print()
-        print("Plex will rescan the updated libraries automatically.")
-        print("If libraries still show errors, trigger a manual scan:")
-        print("  Plex → Libraries → ⋮ → Scan Library Files")
+        print("You can now start Plex:")
+        print("  docker-compose up -d plex")
 
 
 if __name__ == "__main__":
