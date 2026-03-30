@@ -6,19 +6,10 @@ Directly edits the Plex SQLite database to update library folder paths.
 Run this BEFORE starting the Plex container — Plex will boot with the
 correct paths already in place, no API or rescan needed.
 
-Old paths (stored by native Plex package, host filesystem):
-    /volume1/Data/Media/Movies
-    /volume1/Data/Media/TV Shows
-    /volume1/Data/Media/Anime/Movies
-    /volume1/Data/Media/Anime/TV Shows
-    /volume1/Data/Media/Music
-
-New paths (inside the Docker container via /media mount):
-    /media/Movies
-    /media/TV Shows
-    /media/Anime/Movies
-    /media/Anime/TV Shows
-    /media/Music
+Any path stored under /volume1/Data/Media/ (the NAS host path from the
+native Plex package) is rewritten to /media/... (the Docker container
+path via the /media mount). All libraries are handled automatically —
+no hardcoded list needed.
 
 Usage:
     python3 fix-plex-paths.py           # dry run — shows what would change
@@ -38,14 +29,16 @@ DB_PATH = ("/volume1/docker/media/plex/config"
            "/Plex Media Server/Plug-in Support/Databases"
            "/com.plexapp.plugins.library.db")
 
-# Old NAS host path (from native Plex package) → new container path (/media mount)
-PATH_MAP = {
-    "/volume1/Data/Media/Movies":         "/media/Movies",
-    "/volume1/Data/Media/TV Shows":       "/media/TV Shows",
-    "/volume1/Data/Media/Anime/Movies":   "/media/Anime/Movies",
-    "/volume1/Data/Media/Anime/TV Shows": "/media/Anime/TV Shows",
-    "/volume1/Data/Media/Music":          "/media/Music",
-}
+# Any path under this NAS prefix is rewritten to the container mount prefix.
+# Covers all libraries without needing a hardcoded list.
+OLD_PREFIX = "/volume1/Data/Media"
+NEW_PREFIX = "/media"
+
+def remap(path):
+    """Return the new path if it needs remapping, otherwise None."""
+    if path.startswith(OLD_PREFIX):
+        return NEW_PREFIX + path[len(OLD_PREFIX):]
+    return None
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 
@@ -100,7 +93,7 @@ def main():
 
     print()
     for row_id, root_path in rows:
-        new_path = PATH_MAP.get(root_path)
+        new_path = remap(root_path)
         if new_path:
             changes_needed += 1
             info(f"{root_path}")
