@@ -122,7 +122,6 @@ REQUIRED_DIRS=(
     /volume1/docker/media/lidarr/config
     /volume1/docker/media/qbittorrent/config
     /volume1/docker/media/sabnzbd/config
-    /volume1/docker/media/sabnzbd/Downloads/incomplete
     /volume1/docker/media/recyclarr/config
     /volume1/docker/media/unpackerr/config
     /volume1/Data/Media/Movies

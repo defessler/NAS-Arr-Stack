@@ -161,8 +161,32 @@ def sab_api(base, key, params):
     try:
         with urlopen(Request(url), timeout=15) as resp:
             return json.loads(resp.read())
-    except Exception:
+    except HTTPError as e:
+        body = e.read().decode(errors='replace')
+        print(f"    SABnzbd HTTP {e.code}: {body[:150]}")
         return None
+    except Exception as e:
+        print(f"    SABnzbd error: {e}")
+        return None
+
+def sabnzbd_ini_set(ini_path, keyword, value):
+    """Directly replace a keyword value in sabnzbd.ini as a fallback when
+    the API set_config call fails. Returns True on success."""
+    try:
+        with open(ini_path, 'r') as f:
+            content = f.read()
+        new_content, n = re.subn(
+            rf'^({re.escape(keyword)}\s*=\s*).*$',
+            f'{keyword} = {value}',
+            content, flags=re.MULTILINE
+        )
+        if n == 0:
+            return False  # keyword not present in ini — can't add safely
+        with open(ini_path, 'w') as f:
+            f.write(new_content)
+        return True
+    except Exception:
+        return False
 
 def bazarr_get(base, key, path):
     return _request(f"{base}{path}", {'X-API-KEY': key,
@@ -187,7 +211,7 @@ def wait_ready(name, base, key, check_path, retries=24, interval=5):
 
 # ── *arr helpers ──────────────────────────────────────────────────────────────
 
-def add_root_folder(base, key, api, path):
+def add_root_folder(base, key, api, path, extra_fields=None):
     existing = GET(base, key, f"/{api}/rootfolder")
     if existing is None:
         fail(f"Root folder: can't reach API"); return
@@ -195,7 +219,10 @@ def add_root_folder(base, key, api, path):
         skip(f"Root folder: {path}"); return
     # Lidarr requires a 'name' field; Sonarr/Radarr accept but ignore it
     name = os.path.basename(path.rstrip('/')) or path
-    result = POST(base, key, f"/{api}/rootfolder", {"path": path, "name": name})
+    payload = {"path": path, "name": name}
+    if extra_fields:
+        payload.update(extra_fields)
+    result = POST(base, key, f"/{api}/rootfolder", payload)
     ok(f"Root folder: {path}") if result else fail(f"Root folder: {path}")
 
 def add_download_client(base, key, api, name, implementation, field_overrides):
@@ -301,7 +328,7 @@ def add_prowlarr_app(prowlarr_base, prowlarr_key, app_name, implementation,
 
 # ── SABnzbd ───────────────────────────────────────────────────────────────────
 
-def configure_sabnzbd(base, key):
+def configure_sabnzbd(base, key, ini_path):
     section("SABnzbd")
     if not key:
         fail("API key not found — is the container running?"); return
@@ -312,13 +339,38 @@ def configure_sabnzbd(base, key):
         fail("Can't reach SABnzbd API"); return
     ok(f"Connected (SABnzbd {resp.get('version', '?')})")
 
+    ini_modified = False
+
+    def _sab_set(label, keyword, value, extra_params=None):
+        """Try set_config via API; fall back to direct ini edit on failure."""
+        nonlocal ini_modified
+        params = {'mode': 'set_config', 'section': 'misc',
+                  'keyword': keyword, 'value': value}
+        if extra_params:
+            params.update(extra_params)
+        result = sab_api(base, key, params)
+        # status can be True (success) or False (failure); None means API error
+        if result is not None and result.get('status') is not False:
+            ok(f"{label}: {value}")
+            return True
+        # API failed — try editing the ini file directly
+        if sabnzbd_ini_set(ini_path, keyword, value):
+            ok(f"{label}: {value}  (ini edit — SABnzbd restart needed)")
+            ini_modified = True
+            return True
+        fail(f"{label}: failed to set {value}")
+        return False
+
     # Clear host_whitelist so other Docker containers can connect to SABnzbd.
     # By default SABnzbd only accepts connections from its own hostname, which
     # blocks Sonarr/Radarr/Lidarr trying to reach http://sabnzbd:8080.
     result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
                                   'keyword': 'host_whitelist', 'value': ''})
-    if result and result.get('status'):
+    if result is not None and result.get('status') is not False:
         ok("Host whitelist cleared (allows Docker containers to connect)")
+    elif sabnzbd_ini_set(ini_path, 'host_whitelist', ''):
+        ok("Host whitelist cleared  (ini edit — SABnzbd restart needed)")
+        ini_modified = True
     else:
         warn("Could not clear host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
 
@@ -332,14 +384,10 @@ def configure_sabnzbd(base, key):
         cur_val = (current or {}).get('config', {}).get('misc', {}).get(keyword, '')
         if cur_val == value:
             skip(f"{label}: {value}"); continue
-        result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
-                                      'keyword': keyword, 'value': value})
-        if result and result.get('status'):
-            ok(f"{label}: {value}")
-        else:
-            fail(f"{label}: failed to set {value}")
+        _sab_set(label, keyword, value)
 
-    # Categories — add tv / movies / music if not present
+    # Categories — add tv / movies / music if not present.
+    # Uses pp=3 (repair + unpack + delete) per SABnzbd's category API.
     cats_resp = sab_api(base, key, {'mode': 'get_config', 'section': 'categories'})
     existing_cats = {c['name'] for c in
                      (cats_resp or {}).get('config', {}).get('categories', [])}
@@ -350,13 +398,17 @@ def configure_sabnzbd(base, key):
             skip(f"Category: {cat_name}"); continue
         result = sab_api(base, key, {
             'mode': 'set_config', 'section': 'categories',
-            'keyword': cat_name, 'value': '3',   # pp=3 (repair+unpack+delete)
+            'keyword': cat_name, 'pp': '3',
             'dir': cat_dir,
         })
-        if result and result.get('status'):
+        if result is not None and result.get('status') is not False:
             ok(f"Category: {cat_name} → {cat_dir}")
         else:
             fail(f"Category: {cat_name}")
+
+    if ini_modified:
+        warn("SABnzbd config was edited directly — restart to apply:")
+        warn("  docker-compose restart sabnzbd")
 
 # ── Bazarr ────────────────────────────────────────────────────────────────────
 
@@ -607,7 +659,7 @@ def main():
 
     # ── SABnzbd (configure first so Sonarr/Radarr/Lidarr can connect to it) ────
 
-    configure_sabnzbd(SABNZBD, SABNZBD_KEY)
+    configure_sabnzbd(SABNZBD, SABNZBD_KEY, f"{B}/sabnzbd/config/sabnzbd.ini")
 
     # ── Sonarr ────────────────────────────────────────────────────────────────
 
@@ -661,7 +713,15 @@ def main():
     if not LIDARR_KEY:
         fail("API key not found — is the container running?")
     elif wait_ready("Lidarr", LIDARR, LIDARR_KEY, "/api/v1/system/status"):
-        add_root_folder(LIDARR, LIDARR_KEY, "api/v1", "/data/Media/Music")
+        # Lidarr root folder requires qualityProfileId and metadataProfileId
+        # (Sonarr/Radarr don't need these but accept them harmlessly)
+        lidarr_quality_id, _ = get_quality_profile(LIDARR, LIDARR_KEY, "api/v1")
+        lidarr_meta_profiles = GET(LIDARR, LIDARR_KEY, "/api/v1/metadataprofile") or []
+        lidarr_meta_id = lidarr_meta_profiles[0]['id'] if lidarr_meta_profiles else 1
+        add_root_folder(LIDARR, LIDARR_KEY, "api/v1", "/data/Media/Music", {
+            "qualityProfileId":  lidarr_quality_id or 1,
+            "metadataProfileId": lidarr_meta_id,
+        })
         add_download_client(LIDARR, LIDARR_KEY, "api/v1", "qBittorrent", "QBittorrent", {
             "host": QB_HOST, "port": QB_PORT, "useSsl": False,
             "username": QB_USER, "password": QB_PASS, "category": "lidarr",

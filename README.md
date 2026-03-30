@@ -464,12 +464,13 @@ ls -la /volume1/Data/Downloads/
 ```
 
 **Plex doesn't see your media?**
-Library paths inside the Plex container should be:
-- Movies → `/data/Media/Movies`
-- TV Shows → `/data/Media/TV Shows`
-- Anime Movies → `/data/Media/Anime/Movies`
-- Anime TV Shows → `/data/Media/Anime/TV Shows`
-- Music → `/data/Media/Music`
+The entire Media folder is mounted at `/media` inside the Plex container.
+Library paths should be:
+- Movies → `/media/Movies`
+- TV Shows → `/media/TV Shows`
+- Anime Movies → `/media/Anime/Movies`
+- Anime TV Shows → `/media/Anime/TV Shows`
+- Music → `/media/Music`
 
 Update them under Settings → Libraries → Edit → Manage Folders.
 

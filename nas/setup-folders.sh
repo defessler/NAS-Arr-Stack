@@ -97,20 +97,23 @@ cat > "$INIT_DST" << 'INITEOF'
 #!/bin/bash
 # Sets qBittorrent WebUI credentials from environment variables.
 # Runs inside the container at startup via /custom-cont-init.d.
-# Only sets credentials on first boot — skips if already configured.
+# Only runs once — uses a sentinel file so container restarts never
+# overwrite the config (which would cause qBittorrent to lose its
+# torrent list from BT_Backup on next boot).
 
 [ -z "$WEBUI_PASSWORD" ] && exit 0
 
 CONF_DIR="/config/qBittorrent"
 CONF_FILE="$CONF_DIR/qBittorrent.conf"
+SENTINEL="/config/.credentials-set"
 
-mkdir -p "$CONF_DIR"
-
-# Don't overwrite credentials that have already been configured
-if grep -q "Password_PBKDF2" "$CONF_FILE" 2>/dev/null; then
-    echo "[init] qBittorrent credentials already set — skipping"
+# Already initialised — never touch the config again
+if [ -f "$SENTINEL" ]; then
+    echo "[init] qBittorrent already initialised — skipping"
     exit 0
 fi
+
+mkdir -p "$CONF_DIR"
 
 USERNAME="${WEBUI_USERNAME:-admin}"
 
@@ -137,6 +140,8 @@ else
         "$USERNAME" "$HASH" >> "$CONF_FILE"
 fi
 
+# Mark as done — this file's presence prevents any future runs
+touch "$SENTINEL"
 echo "[init] qBittorrent WebUI credentials and download paths configured (user: $USERNAME)"
 INITEOF
 chown $PUID:$PGID "$INIT_DST"

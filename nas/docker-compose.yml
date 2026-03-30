@@ -16,10 +16,7 @@ services:
       - ${LAN_IP}:32400:32400
     volumes:
       - /volume1/docker/media/plex/config:/config
-      - /volume1/Data/Media/Movies:/movies
-      - /volume1/Data/Media/TV Shows:/tv/shows
-      - /volume1/Data/Media/Anime/Movies:/anime/movies
-      - /volume1/Data/Media/Anime/TV Shows:/anime/tv
+      - /volume1/Data/Media:/media
     # Uncomment for Intel Arc GPU transcoding later:
     # devices:
     #   - /dev/dri:/dev/dri
