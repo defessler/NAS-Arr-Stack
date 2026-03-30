@@ -127,6 +127,7 @@ All files that need to be deployed to the NAS live in the `nas/` folder.
 | `post-deploy-validate.sh` | Validates the stack is working after docker-compose up |
 | `setup-arr-config.py` | Auto-configures all services via API after first boot |
 | `fix-qbit-paths.sh` | Updates qBittorrent torrent save paths via API |
+| `fix-plex-paths.py` | Updates Plex library folder paths after a volume mount change |
 
 Run `setup.sh` once after copying files to the NAS. It handles everything in one go.
 Then run `setup-arr-config.py` after containers are up to wire all the services together.
