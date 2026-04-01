@@ -284,6 +284,7 @@ def configure_auth(base, key, api, username, password):
     config['authenticationMethod'] = 'Forms'
     config['username'] = username
     config['password'] = password
+    config['passwordConfirmation'] = password
     result = PUT(base, key, f"/{api}/config/host", config)
     ok(f"Auth: {username}") if result else fail("Auth: failed to set credentials")
 
