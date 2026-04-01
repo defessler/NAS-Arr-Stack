@@ -169,7 +169,7 @@ Copy the data to the Docker config path:
 ```bash
 mkdir -p "/volume1/docker/media/plex/config/Library/Application Support/"
 
-cp -a "/volume1/PlexMediaServer/Library/Application Support/Plex Media Server" \
+cp -a "/volume1/PlexMediaServer/AppData/Plex Media Server" \
       "/volume1/docker/media/plex/config/Library/Application Support/"
 ```
 
