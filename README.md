@@ -155,16 +155,19 @@ QBITTORRENT_PASS=             # choose any password
 ARR_USERNAME=                 # optional — sets login on Sonarr/Radarr/Lidarr/Prowlarr/SABnzbd/Bazarr
 ARR_PASSWORD=                 # leave blank to skip auth setup
 
+NORDVPN_ACCESS_TOKEN=         # from my.nordaccount.com → NordVPN → Access Tokens
 VPN_PROVIDER=nordvpn
 VPN_TYPE=wireguard
-NORDVPN_PRIVATE_KEY=          # leave blank — setup-nordvpn.sh fills this in
+NORDVPN_PRIVATE_KEY=          # leave blank — setup-nordvpn.sh fills this in automatically
 VPN_COUNTRIES=                # e.g. United States, Netherlands
 ```
 
-**Getting your NordVPN WireGuard key:**
+**Getting your NordVPN access token:**
 1. Log in at https://my.nordaccount.com
-2. Go to **NordVPN → Manual configuration → WireGuard**
-3. Generate a key pair and copy the **Private Key**
+2. Go to **NordVPN → Manual configuration → Access Tokens**
+3. Generate a new token and copy it into `NORDVPN_ACCESS_TOKEN`
+
+`setup-nordvpn.sh` (called by `setup.sh`) uses this token to fetch the WireGuard private key automatically and writes it into `.env.local`.
 
 ---
 
