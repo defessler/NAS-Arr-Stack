@@ -82,7 +82,7 @@ def read_sabnzbd_key(ini_path):
 def read_bazarr_key(config_dir):
     """Read API key from Bazarr's config file.
     Tries config.yaml and config.ini — Bazarr versions differ on which they use."""
-    for filename in ('config.yaml', 'config.ini'):
+    for filename in ('config.yaml', 'config.ini', 'config'):
         path = os.path.join(config_dir, filename)
         try:
             with open(path) as f:
