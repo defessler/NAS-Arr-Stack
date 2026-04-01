@@ -120,6 +120,9 @@ RADARR_API_KEY=               # from Radarr → Settings → General (fill in af
 QBITTORRENT_USER=admin
 QBITTORRENT_PASS=             # choose any password
 
+ARR_USERNAME=                 # optional — sets login on Sonarr/Radarr/Lidarr/Prowlarr/SABnzbd/Bazarr
+ARR_PASSWORD=                 # leave blank to skip auth setup
+
 VPN_PROVIDER=nordvpn
 VPN_TYPE=wireguard
 NORDVPN_PRIVATE_KEY=          # leave blank — setup-nordvpn.sh fills this in

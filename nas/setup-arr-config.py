@@ -273,6 +273,20 @@ def add_remote_path_mapping(base, key, api, host, remote, local):
     else:
         fail(f"Remote path: {host} {remote} → {local}")
 
+def configure_auth(base, key, api, username, password):
+    """Set Forms authentication on a *arr service."""
+    config = GET(base, key, f"/{api}/config/host")
+    if config is None:
+        fail("Auth: can't get host config"); return
+    if (config.get('authenticationMethod', '').lower() not in ('none', '')
+            and config.get('username') == username):
+        skip(f"Auth: {username} (already set)"); return
+    config['authenticationMethod'] = 'Forms'
+    config['username'] = username
+    config['password'] = password
+    result = PUT(base, key, f"/{api}/config/host", config)
+    ok(f"Auth: {username}") if result else fail("Auth: failed to set credentials")
+
 def enable_hardlinks(base, key, api):
     config = GET(base, key, f"/{api}/config/mediamanagement")
     if config is None:
@@ -338,7 +352,7 @@ def add_prowlarr_app(prowlarr_base, prowlarr_key, app_name, implementation,
 
 # ── SABnzbd ───────────────────────────────────────────────────────────────────
 
-def configure_sabnzbd(base, key, ini_path):
+def configure_sabnzbd(base, key, ini_path, username=None, password=None):
     section("SABnzbd")
     if not key:
         fail("API key not found — is the container running?"); return
@@ -417,13 +431,20 @@ def configure_sabnzbd(base, key, ini_path):
         else:
             fail(f"Category: {cat_name}")
 
+    # Web UI credentials
+    if username and password:
+        for label, keyword, value in [("Username", "username", username),
+                                       ("Password", "password", password)]:
+            _sab_set(label, keyword, value)
+
     if ini_modified:
         warn("SABnzbd config was edited directly — restart to apply:")
         warn("  docker-compose restart sabnzbd")
 
 # ── Bazarr ────────────────────────────────────────────────────────────────────
 
-def configure_bazarr(base, key, sonarr_key, radarr_key, config_path):
+def configure_bazarr(base, key, sonarr_key, radarr_key, config_path,
+                     username=None, password=None):
     section("Bazarr")
     if not key:
         # Config file not present yet — wait for Bazarr to start and write it
@@ -477,6 +498,17 @@ def configure_bazarr(base, key, sonarr_key, radarr_key, config_path):
         ok("Bazarr → Radarr connection set")
     else:
         skip("Bazarr → Radarr (already set)" if radarr_key else "Bazarr → Radarr (no Radarr key)")
+
+    # Web UI credentials
+    auth = settings.get('auth', {})
+    if username and password and auth.get('username') != username:
+        auth.update({'type': 'basic', 'username': username, 'password': password})
+        general['use_auth'] = True
+        settings['auth'] = auth
+        changed = True
+        ok(f"Bazarr auth: {username}")
+    elif username:
+        skip(f"Bazarr auth: {username} (already set)")
 
     if changed:
         payload = dict(settings)
@@ -636,9 +668,11 @@ def main():
     script_dir = os.path.dirname(os.path.realpath(__file__))
     env        = read_env(os.path.join(script_dir, '.env'))
 
-    LAN_IP  = env.get('LAN_IP', '')
-    QB_USER = env.get('QBITTORRENT_USER', 'admin')
-    QB_PASS = env.get('QBITTORRENT_PASS', '')
+    LAN_IP   = env.get('LAN_IP', '')
+    QB_USER  = env.get('QBITTORRENT_USER', 'admin')
+    QB_PASS  = env.get('QBITTORRENT_PASS', '')
+    ARR_USER = env.get('ARR_USERNAME', '')
+    ARR_PASS = env.get('ARR_PASSWORD', '')
 
     if not LAN_IP:  print("Error: LAN_IP not set in .env");        sys.exit(1)
     if not QB_PASS: print("Error: QBITTORRENT_PASS not set in .env"); sys.exit(1)
@@ -684,7 +718,8 @@ def main():
 
     # ── SABnzbd (configure first so Sonarr/Radarr/Lidarr can connect to it) ────
 
-    configure_sabnzbd(SABNZBD, SABNZBD_KEY, f"{B}/sabnzbd/config/sabnzbd.ini")
+    configure_sabnzbd(SABNZBD, SABNZBD_KEY, f"{B}/sabnzbd/config/sabnzbd.ini",
+                      username=ARR_USER or None, password=ARR_PASS or None)
 
     # ── Sonarr ────────────────────────────────────────────────────────────────
 
@@ -708,6 +743,8 @@ def main():
         add_remote_path_mapping(SONARR, SONARR_KEY, "api/v3",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
         enable_hardlinks(SONARR, SONARR_KEY, "api/v3")
+        if ARR_USER and ARR_PASS:
+            configure_auth(SONARR, SONARR_KEY, "api/v3", ARR_USER, ARR_PASS)
 
     # ── Radarr ────────────────────────────────────────────────────────────────
 
@@ -731,6 +768,8 @@ def main():
         add_remote_path_mapping(RADARR, RADARR_KEY, "api/v3",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
         enable_hardlinks(RADARR, RADARR_KEY, "api/v3")
+        if ARR_USER and ARR_PASS:
+            configure_auth(RADARR, RADARR_KEY, "api/v3", ARR_USER, ARR_PASS)
 
     # ── Lidarr ────────────────────────────────────────────────────────────────
 
@@ -761,6 +800,8 @@ def main():
         add_remote_path_mapping(LIDARR, LIDARR_KEY, "api/v1",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
         enable_hardlinks(LIDARR, LIDARR_KEY, "api/v1")
+        if ARR_USER and ARR_PASS:
+            configure_auth(LIDARR, LIDARR_KEY, "api/v1", ARR_USER, ARR_PASS)
 
     # ── Prowlarr ──────────────────────────────────────────────────────────────
 
@@ -780,11 +821,14 @@ def main():
             add_prowlarr_app(PROWLARR, PROWLARR_KEY, "Lidarr", "Lidarr",
                              "LidarrSettings", LIDARR_INT, LIDARR_KEY,
                              [3000, 3010, 3030, 3040, 3050])
+        if ARR_USER and ARR_PASS:
+            configure_auth(PROWLARR, PROWLARR_KEY, "api/v1", ARR_USER, ARR_PASS)
 
     # ── Bazarr ────────────────────────────────────────────────────────────────
 
     configure_bazarr(BAZARR, BAZARR_KEY, SONARR_KEY, RADARR_KEY,
-                     f"{B}/bazarr/config")
+                     f"{B}/bazarr/config",
+                     username=ARR_USER or None, password=ARR_PASS or None)
 
     # ── Seerr ─────────────────────────────────────────────────────────────────
 
