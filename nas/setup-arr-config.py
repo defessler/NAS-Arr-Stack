@@ -81,22 +81,23 @@ def read_sabnzbd_key(ini_path):
 
 def read_bazarr_key(config_dir):
     """Read API key from Bazarr's config file.
-    Tries config.yaml and config.ini — Bazarr versions differ on which they use."""
-    for filename in ('config.yaml', 'config.ini', 'config'):
-        path = os.path.join(config_dir, filename)
-        try:
-            with open(path) as f:
-                content = f.read()
-            # Match `apikey: value` or `apikey = value` with optional quotes,
-            # anchored to start of line to avoid partial matches
-            m = re.search(r'^\s*apikey\s*[=:]\s*[\'"]?([^\s\'"]+)',
-                          content, re.MULTILINE)
-            if m:
-                return m.group(1)
-        except FileNotFoundError:
-            continue
-        except Exception:
-            continue
+    Tries both the given directory and a nested config/ subdirectory,
+    and several filenames — Bazarr versions differ on location and name."""
+    search_dirs = [config_dir, os.path.join(config_dir, 'config')]
+    for d in search_dirs:
+        for filename in ('config.yaml', 'config.ini', 'config'):
+            path = os.path.join(d, filename)
+            try:
+                with open(path) as f:
+                    content = f.read()
+                m = re.search(r'^\s*apikey\s*[=:]\s*[\'"]?([^\s\'"]+)',
+                              content, re.MULTILINE)
+                if m:
+                    return m.group(1)
+            except FileNotFoundError:
+                continue
+            except Exception:
+                continue
     return None
 
 def read_json_key(json_path, *keys):
