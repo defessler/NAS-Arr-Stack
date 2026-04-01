@@ -10,19 +10,22 @@ A self-hosted media automation stack running on a Synology DS1522+. Tell it what
 - [Scripts](#scripts)
 - [Setup](#setup)
   - [Step 1: Copy files to the NAS](#step-1-copy-files-to-the-nas)
-  - [Step 2: Fill in .env](#step-2-fill-in-env)
+  - [Step 2: Fill in .env.local](#step-2-fill-in-envlocal)
   - [Step 3: Run setup.sh](#step-3-run-setupsh)
-  - [Step 4: Migrate Plex from the native package](#step-4-migrate-plex-from-the-native-package)
-  - [Step 5: Start the stack](#step-5-start-the-stack)
-  - [Step 6: Run the auto-configuration script](#step-6-run-the-auto-configuration-script)
-  - [Step 7: Add indexers and subtitle providers](#step-7-add-indexers-and-subtitle-providers)
-  - [Step 8: Manual configuration](#step-8-manual-configuration)
-  - [Step 9: Verify end-to-end](#step-9-verify-end-to-end)
+  - [Step 4: Start the stack](#step-4-start-the-stack)
+  - [Step 5: Run the auto-configuration script](#step-5-run-the-auto-configuration-script)
+  - [Step 6: Add indexers and subtitle providers](#step-6-add-indexers-and-subtitle-providers)
+  - [Step 7: Manual configuration](#step-7-manual-configuration)
+  - [Step 8: Verify end-to-end](#step-8-verify-end-to-end)
 - [Troubleshooting](#troubleshooting)
 - [Quick Reference](#quick-reference)
   - [Service URLs](#service-urls)
   - [Internal Hostnames](#internal-hostnames)
   - [Docker Compose Cheatsheet](#docker-compose-cheatsheet)
+- [Migrating from Existing Services](#migrating-from-existing-services)
+  - [From the native Plex package](#from-the-native-plex-package)
+  - [From Jackett](#from-jackett)
+  - [From Overseerr](#from-overseerr)
 
 ---
 
@@ -87,7 +90,7 @@ A self-hosted media automation stack running on a Synology DS1522+. Tell it what
 
 ## Scripts
 
-All deployment files live in the `nas/` folder. Copy them to `/volume1/docker/media/` on the NAS.
+All deployment files live in the `nas/` folder. Copy the entire `nas/` directory to `/volume1/docker/media/` on the NAS.
 
 | File | What it does |
 |------|-------------|
@@ -102,10 +105,11 @@ All deployment files live in the `nas/` folder. Copy them to `/volume1/docker/me
 | `setup-validate.sh` | Validates configuration before starting the stack |
 | `post-deploy-validate.sh` | Validates the stack is working after `docker-compose up` |
 | `setup-arr-config.py` | Auto-configures all services via API after first boot |
-| `setup-indexers.py` | Adds torrent/usenet indexers to Prowlarr |
-| `setup-bazarr-providers.py` | Enables subtitle providers in Bazarr |
-| `fix-plex-paths.py` | Updates Plex library paths in the database before first boot |
-| `fix-qbit-paths.sh` | Updates qBittorrent torrent save paths via API |
+| `indexers/setup-indexers.py` | Adds torrent/usenet indexers to Prowlarr |
+| `indexers/setup-bazarr-providers.py` | Enables subtitle providers in Bazarr |
+| `migration/fix-plex-paths.py` | Updates Plex library paths in the database (migration only) |
+| `migration/fix-qbit-paths.sh` | Updates qBittorrent torrent save paths via API (migration only) |
+| `migration/migrate-plex-app.txt` | Step-by-step notes for migrating from the native Plex package |
 
 ---
 
@@ -182,53 +186,11 @@ Safe to re-run at any time.
 
 ---
 
-### Step 4: Migrate Plex from the native package
-
-> Skip this step if you're doing a fresh install with no existing Plex data.
-
-Stop the native Plex package:
-```bash
-synopkg stop PlexMediaServer
-```
-
-Find where it stored its data:
-```bash
-find /volume1 -maxdepth 4 -name "Preferences.xml" -path "*/Plex*" 2>/dev/null
-```
-
-Copy the data to the Docker config path:
-```bash
-mkdir -p "/volume1/docker/media/plex/config/Library/Application Support/"
-
-cp -a "/volume1/PlexMediaServer/AppData/Plex Media Server" \
-      "/volume1/docker/media/plex/config/Library/Application Support/"
-```
-
-Fix ownership:
-```bash
-PUID=$(grep -m1 '^PUID=' /volume1/docker/media/.env | cut -d'=' -f2-)
-PGID=$(grep -m1 '^PGID=' /volume1/docker/media/.env | cut -d'=' -f2-)
-chown -R ${PUID}:${PGID} /volume1/docker/media/plex/config/
-```
-
-Fix Plex library paths — the native package stored NAS host paths in its database; the Docker container uses `/media` instead:
-```bash
-# Dry run first to see what changes
-python3 /volume1/docker/media/fix-plex-paths.py
-
-# Apply
-python3 /volume1/docker/media/fix-plex-paths.py --apply
-```
-
-> When migrating from the native package, `PLEX_CLAIM` in `.env` can be left blank — the existing `Preferences.xml` already has your Plex account token.
-
----
-
-### Step 5: Start the stack
+### Step 4: Start the stack
 
 Get a fresh Plex claim token right before running this (it expires in 4 minutes):
 1. Go to https://plex.tv/claim
-2. Copy the token and set `PLEX_CLAIM=claim-...` in `.env`
+2. Copy the token and set `PLEX_CLAIM=claim-...` in `.env.local`
 
 Then start:
 ```bash
@@ -241,11 +203,11 @@ First run takes a few minutes to pull all images. Watch progress:
 docker-compose logs -f
 ```
 
-> **Note:** Sonarr, Radarr, and Lidarr will show warnings about missing root folders on first boot. This is expected — fixed in Step 6.
+> **Note:** Sonarr, Radarr, and Lidarr will show warnings about missing root folders on first boot. This is expected — fixed in Step 5.
 
 ---
 
-### Step 6: Run the auto-configuration script
+### Step 5: Run the auto-configuration script
 
 Once all containers are up, run:
 ```bash
@@ -270,18 +232,18 @@ Safe to re-run — skips anything already configured.
 
 ---
 
-### Step 7: Add indexers and subtitle providers
+### Step 6: Add indexers and subtitle providers
 
 Run the indexer setup script to populate Prowlarr with torrent and usenet indexers:
 ```bash
-python3 /volume1/docker/media/setup-indexers.py
+python3 /volume1/docker/media/indexers/setup-indexers.py
 ```
 
 Public torrent indexers (1337x, YTS, Nyaa, TPB, etc.) are added automatically. Usenet and private tracker indexers are added if their credentials are set in `.env.local` — see the `.env` template for all available keys.
 
 Run the subtitle provider setup script to enable providers in Bazarr:
 ```bash
-python3 /volume1/docker/media/setup-bazarr-providers.py
+python3 /volume1/docker/media/indexers/setup-bazarr-providers.py
 ```
 
 Free providers (YIFY, Podnapisi, Subscene, etc.) are enabled automatically. Account-based providers (OpenSubtitles, Addic7ed) are enabled if credentials are set in `.env.local`.
@@ -290,7 +252,7 @@ Both scripts are safe to re-run — they skip anything already configured.
 
 ---
 
-### Step 8: Manual configuration
+### Step 7: Manual configuration
 
 The script handles everything it can via API. The following require manual action:
 
@@ -300,28 +262,19 @@ The script handles everything it can via API. The following require manual actio
 
 **Seeding limits** — Settings → BitTorrent → set your preferred ratio (e.g. 2.0) or time limit.
 
-#### Sonarr / Radarr / Lidarr — reassign existing media to new root folders
+#### Sonarr / Radarr / Lidarr
 
-The script adds the new root folders but existing series/movies still point to old paths. Fix via Mass Editor:
-
-- **Sonarr:** Series → Mass Editor → select all → change root to `/data/Media/TV Shows`
-- **Radarr:** Movies → Mass Editor → select all → change root to `/data/Media/Movies`
-- Repeat for anime libraries using `/data/Media/Anime/TV Shows` and `/data/Media/Anime/Movies`
-- Delete old root folders once empty
+Set up your quality profiles and then add the series/movies/artists you want to monitor.
 
 #### Prowlarr (http://192.168.1.242:49150)
 
-Add your indexers — Indexers → **+ Add Indexer**. App connections to Sonarr/Radarr/Lidarr are already done by the script.
-
-If migrating from Jackett, delete the old Jackett-based indexers from Sonarr/Radarr/Lidarr → Settings → Indexers after adding replacements in Prowlarr.
+The setup script already connected Prowlarr to Sonarr, Radarr, and Lidarr. Add any indexers not covered by `setup-indexers.py` manually: Indexers → **+ Add Indexer**.
 
 #### Seerr (http://192.168.1.242:5056)
 
 1. Complete the setup wizard
 2. Connect Plex during the wizard: `http://plex:32400`
 3. Re-run `setup-arr-config.py` — it will wire up Sonarr and Radarr automatically
-
-Migrating from Overseerr? Use Settings → Import in Seerr.
 
 #### Tautulli (http://192.168.1.242:8181)
 
@@ -337,13 +290,9 @@ To trigger a manual sync:
 docker exec recyclarr recyclarr sync
 ```
 
-#### Bazarr — clean up old path mappings
-
-If you had old path mappings referencing `/_video`, delete them. Bazarr now shares the same `/data` mount as Sonarr/Radarr so paths match automatically.
-
 ---
 
-### Step 9: Verify end-to-end
+### Step 8: Verify end-to-end
 
 1. Confirm Gluetun is connected — the IP should be your VPN's, not your home IP:
    ```bash
@@ -394,7 +343,7 @@ Access Plex via direct IP (`http://192.168.1.242:32400/web`) rather than through
 - Verify both downloads and media are under the single `/data` mount
 
 **Sonarr/Radarr gets 403 from SABnzbd**
-Re-run `setup-arr-config.py` — it clears SABnzbd's `host_whitelist` which blocks Docker container connections by default.
+Re-run `setup-arr-config.py` — it merges the required Docker hostnames into SABnzbd's `host_whitelist` which blocks inter-container connections by default.
 
 **qBittorrent can't connect / all torrents stalled**
 Gluetun is likely not connected:
@@ -411,9 +360,6 @@ Always restart the full stack with `down && up`, not `restart`:
 docker-compose down && docker-compose up -d
 ```
 `restart` brings everything up simultaneously without respecting dependency order — qBittorrent tries to join Gluetun's network before Gluetun is ready.
-
-**Old NAS IP references lingering in service configs**
-Search for `192.168.1.241` in each service's settings and replace with the container hostname from the internal hostnames table below.
 
 ---
 
@@ -496,3 +442,86 @@ docker inspect sonarr                                  # full container details
 docker image prune                   # remove unused images
 docker system prune                  # remove stopped containers, unused networks, dangling images
 ```
+
+---
+
+## Migrating from Existing Services
+
+### From the native Plex package
+
+If you're running Plex via Synology Package Center and want to move your library to the Docker container without re-scanning everything.
+
+**Step 1 — Stop the native package**
+```bash
+synopkg stop PlexMediaServer
+```
+
+**Step 2 — Find the existing data**
+```bash
+find /volume1 -maxdepth 4 -name "Preferences.xml" -path "*/Plex*" 2>/dev/null
+```
+
+**Step 3 — Copy to the Docker config path**
+```bash
+mkdir -p "/volume1/docker/media/plex/config/Library/Application Support/"
+
+cp -a "/volume1/PlexMediaServer/AppData/Plex Media Server" \
+      "/volume1/docker/media/plex/config/Library/Application Support/"
+```
+
+**Step 4 — Fix ownership**
+```bash
+PUID=$(grep -m1 '^PUID=' /volume1/docker/media/.env.local | cut -d'=' -f2-)
+PGID=$(grep -m1 '^PGID=' /volume1/docker/media/.env.local | cut -d'=' -f2-)
+chown -R ${PUID}:${PGID} /volume1/docker/media/plex/config/
+```
+
+**Step 5 — Fix library paths**
+
+The native package stored NAS host paths (e.g. `/volume1/...`) in the database; the Docker container uses `/media` instead. Run the path fixer:
+```bash
+# Dry run first to preview changes
+python3 /volume1/docker/media/migration/fix-plex-paths.py
+
+# Apply
+python3 /volume1/docker/media/migration/fix-plex-paths.py --apply
+```
+
+> When migrating from the native package, `PLEX_CLAIM` in `.env.local` can be left blank — the existing `Preferences.xml` already has your Plex account token.
+
+**Step 6 — Reassign existing media to the new root folders**
+
+After starting the stack, Sonarr/Radarr will still have the old root folder paths. Fix via Mass Editor:
+
+- **Sonarr:** Series → Mass Editor → select all → change root to `/data/Media/TV Shows`
+- **Radarr:** Movies → Mass Editor → select all → change root to `/data/Media/Movies`
+- Repeat for anime libraries using `/data/Media/Anime/TV Shows` and `/data/Media/Anime/Movies`
+- Delete old root folders once empty
+
+**Step 7 — Fix qBittorrent save paths (if needed)**
+
+If your torrents were saved to different paths under the old setup:
+```bash
+bash /volume1/docker/media/migration/fix-qbit-paths.sh --dry-run
+bash /volume1/docker/media/migration/fix-qbit-paths.sh
+```
+
+---
+
+### From Jackett
+
+After adding your indexers in Prowlarr and confirming they work, remove the old Jackett-based indexers from each *arr:
+
+- **Sonarr:** Settings → Indexers → delete Jackett entries
+- **Radarr:** Settings → Indexers → delete Jackett entries
+- **Lidarr:** Settings → Indexers → delete Jackett entries
+
+Prowlarr will have already pushed its own indexer connections — you can verify under each app's Settings → Indexers that the Prowlarr-sourced ones are present before deleting.
+
+---
+
+### From Overseerr
+
+Seerr is a fork of Overseerr and can import your existing request history:
+
+Settings → Import (in Seerr) → point it at your Overseerr data.

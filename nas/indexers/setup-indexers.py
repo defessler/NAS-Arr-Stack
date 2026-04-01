@@ -9,7 +9,7 @@ Private torrent trackers (AvistaZ etc.) are added if credentials are in .env.
 Safe to re-run — skips indexers that are already added.
 
 Usage:
-    python3 /volume1/docker/media/setup-indexers.py
+    python3 /volume1/docker/media/indexers/setup-indexers.py
 
 .env keys for usenet (all Newznab-compatible):
     NZBGEEK_API_KEY=
@@ -317,8 +317,11 @@ def read_env(path):
     return env
 
 def read_env_merged(script_dir):
-    env = read_env(os.path.join(script_dir, '.env'))
-    env.update(read_env(os.path.join(script_dir, '.env.local')))
+    # .env/.env.local live in nas/ — walk up if this script is in a subdirectory
+    candidates = [script_dir, os.path.dirname(script_dir)]
+    env_dir = next((d for d in candidates if os.path.exists(os.path.join(d, '.env'))), script_dir)
+    env = read_env(os.path.join(env_dir, '.env'))
+    env.update(read_env(os.path.join(env_dir, '.env.local')))
     return env
 
 def read_arr_key(config_xml):

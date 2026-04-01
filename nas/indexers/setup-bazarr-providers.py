@@ -9,7 +9,7 @@ only if the relevant keys are set in .env.
 Safe to re-run — skips providers that are already enabled.
 
 Usage:
-    python3 /volume1/docker/media/setup-bazarr-providers.py
+    python3 /volume1/docker/media/indexers/setup-bazarr-providers.py
 
 .env keys (optional — only needed for account-based providers):
     OPENSUBTITLES_USER=your_username
@@ -185,8 +185,11 @@ def read_env(path):
     return env
 
 def read_env_merged(script_dir):
-    env = read_env(os.path.join(script_dir, '.env'))
-    env.update(read_env(os.path.join(script_dir, '.env.local')))
+    # .env/.env.local live in nas/ — walk up if this script is in a subdirectory
+    candidates = [script_dir, os.path.dirname(script_dir)]
+    env_dir = next((d for d in candidates if os.path.exists(os.path.join(d, '.env'))), script_dir)
+    env = read_env(os.path.join(env_dir, '.env'))
+    env.update(read_env(os.path.join(env_dir, '.env.local')))
     return env
 
 def read_bazarr_key(config_dir):

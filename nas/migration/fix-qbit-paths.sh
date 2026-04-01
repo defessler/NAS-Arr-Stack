@@ -19,7 +19,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/.env"
+# .env/.env.local live one level up (nas/) — migration/ is a subdirectory
+ENV_FILE="$SCRIPT_DIR/../.env"
+ENV_LOCAL="$SCRIPT_DIR/../.env.local"
 
 # ── Options ───────────────────────────────────────────────────────────────────
 
@@ -36,8 +38,13 @@ done
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-# Read .env values (can be overridden by env vars)
-env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-; }
+# Read .env values (can be overridden by env vars); .env.local takes priority
+env_val() {
+    local val
+    val=$(grep -m1 "^$1=" "$ENV_LOCAL" 2>/dev/null | cut -d'=' -f2- | sed 's/#.*//' | xargs)
+    [ -z "$val" ] && val=$(grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | sed 's/#.*//' | xargs)
+    echo "$val"
+}
 
 QB_HOST="${QB_HOST:-$(env_val LAN_IP)}"
 QB_PORT="${QB_PORT:-49156}"

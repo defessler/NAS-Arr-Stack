@@ -1,0 +1,10 @@
+# Create the target directory structure
+mkdir -p "/volume1/docker/media/plex/config/Library/Application Support/"
+
+# Copy everything (replace source path if yours differs)
+cp -a "/volume1/PlexMediaServer/AppData/Plex Media Server" \
+      "/volume1/docker/media/plex/config/Library/Application Support/"
+
+PUID=$(grep -m1 '^PUID=' /volume1/Data/Scripts/.env | cut -d'=' -f2-)
+PGID=$(grep -m1 '^PGID=' /volume1/Data/Scripts/.env | cut -d'=' -f2-)
+chown -R ${PUID}:${PGID} /volume1/docker/media/plex/config/
