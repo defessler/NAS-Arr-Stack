@@ -48,16 +48,28 @@ def section(title):
 # ── Read config files ─────────────────────────────────────────────────────────
 
 def read_env(path):
+    """Read key=value pairs from a file, ignoring comments and blank lines.
+    Inline comments after the value (e.g. KEY=value  # comment) are stripped."""
     env = {}
     try:
         with open(path) as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    k, _, v = line.partition('=')
-                    env[k.strip()] = v.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                k, _, v = line.partition('=')
+                # Strip inline comments
+                v = v.split('#')[0].strip()
+                if v:
+                    env[k.strip()] = v
     except FileNotFoundError:
         pass
+    return env
+
+def read_env_merged(script_dir):
+    """.env.local (gitignored, real values) overrides .env (template, committed)."""
+    env = read_env(os.path.join(script_dir, '.env'))
+    env.update(read_env(os.path.join(script_dir, '.env.local')))
     return env
 
 def read_arr_key(config_xml):
@@ -274,19 +286,24 @@ def add_remote_path_mapping(base, key, api, host, remote, local):
         fail(f"Remote path: {host} {remote} → {local}")
 
 def configure_auth(base, key, api, username, password):
-    """Set Forms authentication on a *arr service."""
+    """Set Forms authentication on a *arr service, bypassed for local addresses."""
     config = GET(base, key, f"/{api}/config/host")
     if config is None:
         fail("Auth: can't get host config"); return
-    if (config.get('authenticationMethod', '').lower() not in ('none', '')
-            and config.get('username') == username):
+    already_set = (
+        config.get('authenticationMethod', '').lower() not in ('none', '')
+        and config.get('username') == username
+        and config.get('authenticationRequired') == 'DisabledForLocalAddresses'
+    )
+    if already_set:
         skip(f"Auth: {username} (already set)"); return
     config['authenticationMethod'] = 'Forms'
+    config['authenticationRequired'] = 'DisabledForLocalAddresses'
     config['username'] = username
     config['password'] = password
     config['passwordConfirmation'] = password
     result = PUT(base, key, f"/{api}/config/host", config)
-    ok(f"Auth: {username}") if result else fail("Auth: failed to set credentials")
+    ok(f"Auth: {username} (LAN bypass on)") if result else fail("Auth: failed to set credentials")
 
 def enable_hardlinks(base, key, api):
     config = GET(base, key, f"/{api}/config/mediamanagement")
@@ -353,7 +370,7 @@ def add_prowlarr_app(prowlarr_base, prowlarr_key, app_name, implementation,
 
 # ── SABnzbd ───────────────────────────────────────────────────────────────────
 
-def configure_sabnzbd(base, key, ini_path, username=None, password=None):
+def configure_sabnzbd(base, key, ini_path):
     section("SABnzbd")
     if not key:
         fail("API key not found — is the container running?"); return
@@ -387,18 +404,27 @@ def configure_sabnzbd(base, key, ini_path, username=None, password=None):
         return False
 
     # Add all service hostnames to host_whitelist so Docker containers can reach
-    # SABnzbd. Setting it to '' stores [''] (non-empty list) not [] (empty list),
-    # so SABnzbd still blocks everything. Explicit hostnames are more reliable.
-    WHITELIST = 'sabnzbd,sonarr,radarr,lidarr,bazarr,prowlarr,localhost,127.0.0.1'
-    result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
-                                  'keyword': 'host_whitelist', 'value': WHITELIST})
-    if result is not None and result.get('status') is not False:
-        ok("Host whitelist updated (Docker service hostnames allowed)")
-    elif sabnzbd_ini_set(ini_path, 'host_whitelist', WHITELIST):
-        ok("Host whitelist updated  (ini edit — SABnzbd restart needed)")
-        ini_modified = True
+    # SABnzbd. We read the current value first and merge so the container's own
+    # hostname (auto-added by SABnzbd) is preserved alongside our service names.
+    REQUIRED_HOSTS = {'sabnzbd', 'sonarr', 'radarr', 'lidarr',
+                      'bazarr', 'prowlarr', 'localhost', '127.0.0.1'}
+    cur = sab_api(base, key, {'mode': 'get_config', 'section': 'misc',
+                               'keyword': 'host_whitelist'})
+    existing_raw = (cur or {}).get('config', {}).get('misc', {}).get('host_whitelist', '')
+    existing = {h.strip() for h in existing_raw.split(',') if h.strip()}
+    if REQUIRED_HOSTS.issubset(existing):
+        skip("Host whitelist (already contains all required hostnames)")
     else:
-        warn("Could not update host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
+        merged = ','.join(sorted(existing | REQUIRED_HOSTS))
+        result = sab_api(base, key, {'mode': 'set_config', 'section': 'misc',
+                                      'keyword': 'host_whitelist', 'value': merged})
+        if result is not None and result.get('status') is not False:
+            ok("Host whitelist updated (Docker service hostnames allowed)")
+        elif sabnzbd_ini_set(ini_path, 'host_whitelist', merged):
+            ok("Host whitelist updated (ini edit — SABnzbd restart needed)")
+            ini_modified = True
+        else:
+            warn("Could not update host_whitelist — Sonarr/Radarr may get 403 from SABnzbd")
 
     # Download directories
     for label, keyword, value in [
@@ -432,11 +458,9 @@ def configure_sabnzbd(base, key, ini_path, username=None, password=None):
         else:
             fail(f"Category: {cat_name}")
 
-    # Web UI credentials
-    if username and password:
-        for label, keyword, value in [("Username", "username", username),
-                                       ("Password", "password", password)]:
-            _sab_set(label, keyword, value)
+    # SABnzbd uses API key auth for all container-to-container communication,
+    # so username/password credentials are not needed and would force a browser
+    # login prompt with no way to bypass it for local connections.
 
     if ini_modified:
         warn("SABnzbd config was edited directly — restart to apply:")
@@ -521,7 +545,8 @@ def configure_bazarr(base, key, sonarr_key, radarr_key, config_path,
 
 # ── Seerr ─────────────────────────────────────────────────────────────────────
 
-def configure_seerr(base, key, sonarr_base, sonarr_key, radarr_base, radarr_key):
+def configure_seerr(base, key, sonarr_base, sonarr_key, radarr_base, radarr_key,
+                    username=None, password=None):
     section("Seerr")
     if not key:
         warn("settings.json not found — complete the Seerr setup wizard first,")
@@ -529,11 +554,20 @@ def configure_seerr(base, key, sonarr_base, sonarr_key, radarr_base, radarr_key)
         return
 
     # Test connection
-    status = GET(base, key, "/api/v1/settings/main")
-    if status is None:
+    main_settings = GET(base, key, "/api/v1/settings/main")
+    if main_settings is None:
         warn("Seerr setup wizard not yet complete — skipping.")
         warn("Visit http://<NAS>:5056, run the wizard, then re-run this script.")
         return
+
+    # Ensure local (username/password) login is enabled so LAN users can log in
+    # without needing Plex auth
+    if main_settings.get('localLogin') is False:
+        main_settings['localLogin'] = True
+        result = POST(base, key, "/api/v1/settings/main", main_settings)
+        ok("Local login enabled") if result is not None else fail("Local login: failed to enable")
+    else:
+        skip("Local login (already enabled)")
 
     # Sonarr
     if sonarr_key:
@@ -545,23 +579,24 @@ def configure_seerr(base, key, sonarr_base, sonarr_key, radarr_base, radarr_key)
                                                             "api/v3", "1080p")
             lang_id = get_language_profile(sonarr_base, sonarr_key)
             result = POST(base, key, "/api/v1/settings/sonarr", {
-                "name":              "Sonarr",
-                "hostname":          "sonarr",
-                "port":              8989,
-                "apiKey":            sonarr_key,
-                "useSsl":            False,
-                "baseUrl":           "",
-                "activeProfileId":   profile_id or 1,
-                "activeProfileName": profile_name or "HD-1080p",
-                "activeDirectory":   "/data/Media/TV Shows",
-                "is4k":              False,
-                "isDefault":         True,
-                "syncEnabled":       False,
-                "preventSearch":     False,
-                "seasons":           True,
-                "tags":              [],
-                "animeDirectory":    "/data/Media/Anime/TV Shows",
-                "languageProfileId": lang_id,
+                "name":                "Sonarr",
+                "hostname":            "sonarr",
+                "port":                8989,
+                "apiKey":              sonarr_key,
+                "useSsl":              False,
+                "baseUrl":             "",
+                "activeProfileId":     profile_id or 1,
+                "activeProfileName":   profile_name or "HD-1080p",
+                "activeDirectory":     "/data/Media/TV Shows",
+                "is4k":                False,
+                "isDefault":           True,
+                "syncEnabled":         False,
+                "preventSearch":       False,
+                "seasons":             True,
+                "enableSeasonFolders": True,
+                "tags":                [],
+                "animeDirectory":      "/data/Media/Anime/TV Shows",
+                "languageProfileId":   lang_id,
             })
             ok("Seerr → Sonarr connection set") if result else fail("Seerr → Sonarr: failed")
 
@@ -574,21 +609,22 @@ def configure_seerr(base, key, sonarr_base, sonarr_key, radarr_base, radarr_key)
             profile_id, profile_name = get_quality_profile(radarr_base, radarr_key,
                                                             "api/v3", "1080p")
             result = POST(base, key, "/api/v1/settings/radarr", {
-                "name":              "Radarr",
-                "hostname":          "radarr",
-                "port":              7878,
-                "apiKey":            radarr_key,
-                "useSsl":            False,
-                "baseUrl":           "",
-                "activeProfileId":   profile_id or 1,
-                "activeProfileName": profile_name or "HD-1080p",
-                "activeDirectory":   "/data/Media/Movies",
-                "is4k":              False,
-                "isDefault":         True,
-                "syncEnabled":       False,
-                "preventSearch":     False,
-                "tags":              [],
-                "animeDirectory":    "/data/Media/Anime/Movies",
+                "name":                "Radarr",
+                "hostname":            "radarr",
+                "port":                7878,
+                "apiKey":              radarr_key,
+                "useSsl":              False,
+                "baseUrl":             "",
+                "activeProfileId":     profile_id or 1,
+                "activeProfileName":   profile_name or "HD-1080p",
+                "activeDirectory":     "/data/Media/Movies",
+                "is4k":                False,
+                "isDefault":           True,
+                "syncEnabled":         False,
+                "preventSearch":       False,
+                "minimumAvailability": "released",
+                "tags":                [],
+                "animeDirectory":      "/data/Media/Anime/Movies",
             })
             ok("Seerr → Radarr connection set") if result else fail("Seerr → Radarr: failed")
 
@@ -667,7 +703,7 @@ def write_config_file(label, path, content):
 
 def main():
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    env        = read_env(os.path.join(script_dir, '.env'))
+    env        = read_env_merged(script_dir)
 
     LAN_IP   = env.get('LAN_IP', '')
     QB_USER  = env.get('QBITTORRENT_USER', 'admin')
@@ -692,15 +728,15 @@ def main():
     RADARR_INT = "http://radarr:7878"
     LIDARR_INT = "http://lidarr:8686"
 
-    # ── API keys ──────────────────────────────────────────────────────────────
+    # ── API keys — .env takes priority, config files are the fallback ───────────
     B = "/volume1/docker/media"
-    SONARR_KEY   = read_arr_key(f"{B}/sonarr/config/config.xml")
-    RADARR_KEY   = read_arr_key(f"{B}/radarr/config/config.xml")
-    LIDARR_KEY   = read_arr_key(f"{B}/lidarr/config/config.xml")
-    PROWLARR_KEY = read_arr_key(f"{B}/prowlarr/config/config.xml")
-    SABNZBD_KEY  = read_sabnzbd_key(f"{B}/sabnzbd/config/sabnzbd.ini")
-    BAZARR_KEY   = read_bazarr_key(f"{B}/bazarr/config")
-    SEERR_KEY    = read_json_key(f"{B}/seerr/config/settings.json", "apiKey")
+    SONARR_KEY   = env.get('SONARR_API_KEY')   or read_arr_key(f"{B}/sonarr/config/config.xml")
+    RADARR_KEY   = env.get('RADARR_API_KEY')   or read_arr_key(f"{B}/radarr/config/config.xml")
+    LIDARR_KEY   = env.get('LIDARR_API_KEY')   or read_arr_key(f"{B}/lidarr/config/config.xml")
+    PROWLARR_KEY = env.get('PROWLARR_API_KEY') or read_arr_key(f"{B}/prowlarr/config/config.xml")
+    SABNZBD_KEY  = env.get('SABNZBD_API_KEY')  or read_sabnzbd_key(f"{B}/sabnzbd/config/sabnzbd.ini")
+    BAZARR_KEY   = env.get('BAZARR_API_KEY')   or read_bazarr_key(f"{B}/bazarr/config")
+    SEERR_KEY    = env.get('SEERR_API_KEY')    or read_json_key(f"{B}/seerr/config/settings.json", "main", "apiKey")
 
     # qBittorrent shares Gluetun's network namespace
     QB_HOST = "gluetun"
@@ -719,8 +755,7 @@ def main():
 
     # ── SABnzbd (configure first so Sonarr/Radarr/Lidarr can connect to it) ────
 
-    configure_sabnzbd(SABNZBD, SABNZBD_KEY, f"{B}/sabnzbd/config/sabnzbd.ini",
-                      username=ARR_USER or None, password=ARR_PASS or None)
+    configure_sabnzbd(SABNZBD, SABNZBD_KEY, f"{B}/sabnzbd/config/sabnzbd.ini")
 
     # ── Sonarr ────────────────────────────────────────────────────────────────
 
@@ -833,7 +868,8 @@ def main():
 
     # ── Seerr ─────────────────────────────────────────────────────────────────
 
-    configure_seerr(SEERR, SEERR_KEY, SONARR, SONARR_KEY, RADARR, RADARR_KEY)
+    configure_seerr(SEERR, SEERR_KEY, SONARR, SONARR_KEY, RADARR, RADARR_KEY,
+                    username=ARR_USER or None, password=ARR_PASS or None)
 
     # ── Config files ──────────────────────────────────────────────────────────
 
