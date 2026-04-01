@@ -4,6 +4,28 @@ A self-hosted media automation stack running on a Synology DS1522+. Tell it what
 
 ---
 
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Scripts](#scripts)
+- [Setup](#setup)
+  - [Step 1: Copy files to the NAS](#step-1-copy-files-to-the-nas)
+  - [Step 2: Fill in .env](#step-2-fill-in-env)
+  - [Step 3: Run setup.sh](#step-3-run-setupsh)
+  - [Step 4: Migrate Plex from the native package](#step-4-migrate-plex-from-the-native-package)
+  - [Step 5: Start the stack](#step-5-start-the-stack)
+  - [Step 6: Run the auto-configuration script](#step-6-run-the-auto-configuration-script)
+  - [Step 7: Add indexers and subtitle providers](#step-7-add-indexers-and-subtitle-providers)
+  - [Step 8: Manual configuration](#step-8-manual-configuration)
+  - [Step 9: Verify end-to-end](#step-9-verify-end-to-end)
+- [Troubleshooting](#troubleshooting)
+- [Quick Reference](#quick-reference)
+  - [Service URLs](#service-urls)
+  - [Internal Hostnames](#internal-hostnames)
+  - [Docker Compose Cheatsheet](#docker-compose-cheatsheet)
+
+---
+
 ## How it works
 
 ```
@@ -70,7 +92,8 @@ All deployment files live in the `nas/` folder. Copy them to `/volume1/docker/me
 | File | What it does |
 |------|-------------|
 | `docker-compose.yml` | Full stack definition |
-| `.env` | Your local config and secrets — never committed to git |
+| `.env` | Config template — committed to git with all keys documented, no values |
+| `.env.local` | Your actual values — gitignored, never committed |
 | `setup.sh` | Master script — runs all setup steps in order |
 | `setup-chmod.sh` | Sets correct permissions on all stack files |
 | `setup-folders.sh` | Creates required directories and sets ownership |
@@ -79,6 +102,8 @@ All deployment files live in the `nas/` folder. Copy them to `/volume1/docker/me
 | `setup-validate.sh` | Validates configuration before starting the stack |
 | `post-deploy-validate.sh` | Validates the stack is working after `docker-compose up` |
 | `setup-arr-config.py` | Auto-configures all services via API after first boot |
+| `setup-indexers.py` | Adds torrent/usenet indexers to Prowlarr |
+| `setup-bazarr-providers.py` | Enables subtitle providers in Bazarr |
 | `fix-plex-paths.py` | Updates Plex library paths in the database before first boot |
 | `fix-qbit-paths.sh` | Updates qBittorrent torrent save paths via API |
 
@@ -99,12 +124,15 @@ scp -r nas/ user@192.168.1.242:/volume1/docker/media/
 
 ---
 
-### Step 2: Fill in .env
+### Step 2: Fill in .env.local
 
-SSH into the NAS and edit the `.env` file:
+Copy the template and fill in your values:
 ```bash
-nano /volume1/docker/media/.env
+cp /volume1/docker/media/.env /volume1/docker/media/.env.local
+nano /volume1/docker/media/.env.local
 ```
+
+`.env` is the committed template with all keys documented. `.env.local` holds your real values and is gitignored — never committed.
 
 ```env
 PUID=1034
@@ -242,7 +270,27 @@ Safe to re-run — skips anything already configured.
 
 ---
 
-### Step 7: Manual configuration
+### Step 7: Add indexers and subtitle providers
+
+Run the indexer setup script to populate Prowlarr with torrent and usenet indexers:
+```bash
+python3 /volume1/docker/media/setup-indexers.py
+```
+
+Public torrent indexers (1337x, YTS, Nyaa, TPB, etc.) are added automatically. Usenet and private tracker indexers are added if their credentials are set in `.env.local` — see the `.env` template for all available keys.
+
+Run the subtitle provider setup script to enable providers in Bazarr:
+```bash
+python3 /volume1/docker/media/setup-bazarr-providers.py
+```
+
+Free providers (YIFY, Podnapisi, Subscene, etc.) are enabled automatically. Account-based providers (OpenSubtitles, Addic7ed) are enabled if credentials are set in `.env.local`.
+
+Both scripts are safe to re-run — they skip anything already configured.
+
+---
+
+### Step 8: Manual configuration
 
 The script handles everything it can via API. The following require manual action:
 
@@ -295,7 +343,7 @@ If you had old path mappings referencing `/_video`, delete them. Bazarr now shar
 
 ---
 
-### Step 8: Verify end-to-end
+### Step 9: Verify end-to-end
 
 1. Confirm Gluetun is connected — the IP should be your VPN's, not your home IP:
    ```bash
