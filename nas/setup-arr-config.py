@@ -79,16 +79,25 @@ def read_sabnzbd_key(ini_path):
         pass
     return None
 
-def read_bazarr_key(config_path):
-    """Read API key from Bazarr's config.yaml (regex, no yaml dep needed)."""
-    try:
-        with open(config_path) as f:
-            content = f.read()
-        # Works for both `general: {apikey: X}` and `auth: {apikey: X}` layouts
-        m = re.search(r'apikey[:\s]+[\'"]?([a-zA-Z0-9]+)[\'"]?', content)
-        return m.group(1) if m else None
-    except Exception:
-        return None
+def read_bazarr_key(config_dir):
+    """Read API key from Bazarr's config file.
+    Tries config.yaml and config.ini — Bazarr versions differ on which they use."""
+    for filename in ('config.yaml', 'config.ini'):
+        path = os.path.join(config_dir, filename)
+        try:
+            with open(path) as f:
+                content = f.read()
+            # Match `apikey: value` or `apikey = value` with optional quotes,
+            # anchored to start of line to avoid partial matches
+            m = re.search(r'^\s*apikey\s*[=:]\s*[\'"]?([^\s\'"]+)',
+                          content, re.MULTILINE)
+            if m:
+                return m.group(1)
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+    return None
 
 def read_json_key(json_path, *keys):
     """Read a value from a JSON file by key path."""
@@ -413,10 +422,24 @@ def configure_sabnzbd(base, key, ini_path):
 
 # ── Bazarr ────────────────────────────────────────────────────────────────────
 
-def configure_bazarr(base, key, sonarr_key, radarr_key):
+def configure_bazarr(base, key, sonarr_key, radarr_key, config_path):
     section("Bazarr")
     if not key:
-        fail("API key not found — has the container fully started?"); return
+        # Config file not present yet — wait for Bazarr to start and write it
+        sys.stdout.write("  Waiting for Bazarr config ")
+        sys.stdout.flush()
+        for _ in range(24):  # up to 2 minutes
+            time.sleep(5)
+            key = read_bazarr_key(config_path)
+            if key:
+                print(f"{GREEN}✔{RESET}")
+                break
+            sys.stdout.write(".")
+            sys.stdout.flush()
+        else:
+            print(f"{RED}✘ timed out{RESET}")
+            fail("Bazarr config not found — visit the Bazarr UI once to trigger config creation, then re-run")
+            return
 
     settings = bazarr_get(base, key, "/api/system/settings")
     if settings is None:
@@ -640,7 +663,7 @@ def main():
     LIDARR_KEY   = read_arr_key(f"{B}/lidarr/config/config.xml")
     PROWLARR_KEY = read_arr_key(f"{B}/prowlarr/config/config.xml")
     SABNZBD_KEY  = read_sabnzbd_key(f"{B}/sabnzbd/config/sabnzbd.ini")
-    BAZARR_KEY   = read_bazarr_key(f"{B}/bazarr/config/config.yaml")
+    BAZARR_KEY   = read_bazarr_key(f"{B}/bazarr/config")
     SEERR_KEY    = read_json_key(f"{B}/seerr/config/settings.json", "apiKey")
 
     # qBittorrent shares Gluetun's network namespace
@@ -759,7 +782,8 @@ def main():
 
     # ── Bazarr ────────────────────────────────────────────────────────────────
 
-    configure_bazarr(BAZARR, BAZARR_KEY, SONARR_KEY, RADARR_KEY)
+    configure_bazarr(BAZARR, BAZARR_KEY, SONARR_KEY, RADARR_KEY,
+                     f"{B}/bazarr/config")
 
     # ── Seerr ─────────────────────────────────────────────────────────────────
 
