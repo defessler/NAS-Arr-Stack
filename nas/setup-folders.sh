@@ -61,6 +61,9 @@ DATA_DIRS=(
     /volume1/Data/Downloads/Torrents/Completed/radarr
     /volume1/Data/Downloads/Usenet/incomplete
     /volume1/Data/Downloads/Usenet/complete
+    /volume1/Data/Downloads/Usenet/complete/tv
+    /volume1/Data/Downloads/Usenet/complete/movies
+    /volume1/Data/Downloads/Usenet/complete/music
 )
 
 # ── Create and chown ───────────────────────────────────────────────────────────

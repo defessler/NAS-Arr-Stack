@@ -798,6 +798,8 @@ def main():
             warn("SABnzbd key not found — skipping")
         add_remote_path_mapping(SONARR, SONARR_KEY, "api/v3",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
+        add_remote_path_mapping(SONARR, SONARR_KEY, "api/v3",
+                                "sabnzbd", "/data/complete", "/data/Downloads/Usenet/complete")
         enable_hardlinks(SONARR, SONARR_KEY, "api/v3")
         if ARR_USER and ARR_PASS:
             configure_auth(SONARR, SONARR_KEY, "api/v3", ARR_USER, ARR_PASS)
@@ -823,6 +825,8 @@ def main():
             warn("SABnzbd key not found — skipping")
         add_remote_path_mapping(RADARR, RADARR_KEY, "api/v3",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
+        add_remote_path_mapping(RADARR, RADARR_KEY, "api/v3",
+                                "sabnzbd", "/data/complete", "/data/Downloads/Usenet/complete")
         enable_hardlinks(RADARR, RADARR_KEY, "api/v3")
         if ARR_USER and ARR_PASS:
             configure_auth(RADARR, RADARR_KEY, "api/v3", ARR_USER, ARR_PASS)
@@ -855,6 +859,8 @@ def main():
             warn("SABnzbd key not found — skipping")
         add_remote_path_mapping(LIDARR, LIDARR_KEY, "api/v1",
                                 QB_HOST, "/downloads", "/data/Downloads/Torrents")
+        add_remote_path_mapping(LIDARR, LIDARR_KEY, "api/v1",
+                                "sabnzbd", "/data/complete", "/data/Downloads/Usenet/complete")
         enable_hardlinks(LIDARR, LIDARR_KEY, "api/v1")
         if ARR_USER and ARR_PASS:
             configure_auth(LIDARR, LIDARR_KEY, "api/v1", ARR_USER, ARR_PASS)
