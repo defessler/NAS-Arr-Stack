@@ -66,14 +66,26 @@ check_var "PUID"
 check_var "PGID"
 check_var "TZ"
 check_var "LAN_IP"
-check_var "SONARR_API_KEY"
-check_var "RADARR_API_KEY"
 check_var "VPN_PROVIDER"
 check_var "VPN_TYPE"
 check_var "VPN_COUNTRIES"
 check_var "NORDVPN_PRIVATE_KEY"
 check_var "QBITTORRENT_USER"
 check_var "QBITTORRENT_PASS"
+
+# API keys are filled in by setup-arr-config.py after first boot — warn only
+check_var_warn() {
+    local key="$1"
+    local val
+    val=$(env_val "$key")
+    if [ -z "$val" ]; then
+        warn "$key not set — will be filled in automatically by setup-arr-config.py"
+    else
+        ok "$key is set"
+    fi
+}
+check_var_warn "SONARR_API_KEY"
+check_var_warn "RADARR_API_KEY"
 
 # Validate LAN_IP looks like an IP address
 LAN_IP=$(env_val "LAN_IP")

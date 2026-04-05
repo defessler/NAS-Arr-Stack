@@ -10,13 +10,10 @@ A self-hosted media automation stack running on a Synology DS1522+. Tell it what
 - [Scripts](#scripts)
 - [Setup](#setup)
   - [Step 1: Copy files to the NAS](#step-1-copy-files-to-the-nas)
-  - [Step 2: Fill in .env.local](#step-2-fill-in-envlocal)
+  - [Step 2: Fill in .env](#step-2-fill-in-env)
   - [Step 3: Run setup.sh](#step-3-run-setupsh)
-  - [Step 4: Start the stack](#step-4-start-the-stack)
-  - [Step 5: Run the auto-configuration script](#step-5-run-the-auto-configuration-script)
-  - [Step 6: Add indexers and subtitle providers](#step-6-add-indexers-and-subtitle-providers)
-  - [Step 7: Manual configuration](#step-7-manual-configuration)
-  - [Step 8: Verify end-to-end](#step-8-verify-end-to-end)
+  - [Step 4: Manual configuration](#step-4-manual-configuration)
+  - [Step 5: Verify end-to-end](#step-5-verify-end-to-end)
 - [Troubleshooting](#troubleshooting)
 - [Quick Reference](#quick-reference)
   - [Service URLs](#service-urls)
@@ -128,7 +125,7 @@ scp -r nas/ user@192.168.1.242:/volume1/docker/media/
 
 ---
 
-### Step 2: Fill in .env.local
+### Step 2: Fill in .env
 
 Copy the template and fill in your values:
 ```bash
@@ -173,51 +170,28 @@ VPN_COUNTRIES=                # e.g. United States, Netherlands
 
 ### Step 3: Run setup.sh
 
+Get a fresh Plex claim token right before running this (it expires in 4 minutes):
+1. Go to https://plex.tv/claim
+2. Copy the token and set `PLEX_CLAIM=claim-...` in `.env`
+
+Then run:
 ```bash
 sudo bash /volume1/docker/media/setup.sh
 ```
 
-This handles everything in one go:
+This handles everything in one command:
 1. Sets correct permissions on all scripts and config files
 2. Creates all required directories with correct ownership
-3. Deploys the qBittorrent credential init script
-4. Applies iptables firewall rules and installs them to survive reboots
-5. Fetches your NordVPN WireGuard key and writes it to `.env`
-6. Validates the full configuration
+3. Applies iptables firewall rules and installs them to survive reboots
+4. Fetches your NordVPN WireGuard key and writes it to `.env`
+5. Validates the full configuration
+6. Starts the stack with `docker-compose up -d`
+7. Waits for all services to come up (first run downloads images — may take a few minutes)
+8. Configures all services automatically via API (root folders, download clients, indexer connections, auth)
+9. Adds torrent and usenet indexers to Prowlarr
+10. Enables subtitle providers in Bazarr
 
-Safe to re-run at any time.
-
----
-
-### Step 4: Start the stack
-
-Get a fresh Plex claim token right before running this (it expires in 4 minutes):
-1. Go to https://plex.tv/claim
-2. Copy the token and set `PLEX_CLAIM=claim-...` in `.env.local`
-
-Then start:
-```bash
-cd /volume1/docker/media
-docker-compose up -d
-```
-
-First run takes a few minutes to pull all images. Watch progress:
-```bash
-docker-compose logs -f
-```
-
-> **Note:** Sonarr, Radarr, and Lidarr will show warnings about missing root folders on first boot. This is expected — fixed in Step 5.
-
----
-
-### Step 5: Run the auto-configuration script
-
-Once all containers are up, run:
-```bash
-python3 /volume1/docker/media/setup-arr-config.py
-```
-
-What it configures automatically:
+What gets configured automatically:
 
 | Service | What gets set up |
 |---------|-----------------|
@@ -225,37 +199,17 @@ What it configures automatically:
 | Sonarr | Root folders, qBittorrent + SABnzbd clients, remote path mapping, hardlinks |
 | Radarr | Same with movie categories and roots |
 | Lidarr | Same with music category and root |
-| Prowlarr | Sonarr, Radarr, and Lidarr app connections |
-| Bazarr | Sonarr and Radarr connections |
-| Seerr | Sonarr and Radarr connections *(after wizard — see Step 7)* |
+| Prowlarr | Sonarr, Radarr, and Lidarr app connections; public torrent + usenet indexers |
+| Bazarr | Sonarr and Radarr connections; free subtitle providers |
+| Seerr | Sonarr and Radarr connections *(after wizard — see Step 4)* |
 | Unpackerr | Generates `unpackerr.conf` with API keys pre-filled |
 | Recyclarr | Generates starter `recyclarr.yml` with API keys pre-filled |
 
-Safe to re-run — skips anything already configured.
+Safe to re-run — all steps skip anything already configured.
 
 ---
 
-### Step 6: Add indexers and subtitle providers
-
-Run the indexer setup script to populate Prowlarr with torrent and usenet indexers:
-```bash
-python3 /volume1/docker/media/indexers/setup-indexers.py
-```
-
-Public torrent indexers (1337x, YTS, Nyaa, TPB, etc.) are added automatically. Usenet and private tracker indexers are added if their credentials are set in `.env.local` — see the `.env` template for all available keys.
-
-Run the subtitle provider setup script to enable providers in Bazarr:
-```bash
-python3 /volume1/docker/media/indexers/setup-bazarr-providers.py
-```
-
-Free providers (YIFY, Podnapisi, Subscene, etc.) are enabled automatically. Account-based providers (OpenSubtitles, Addic7ed) are enabled if credentials are set in `.env.local`.
-
-Both scripts are safe to re-run — they skip anything already configured.
-
----
-
-### Step 7: Manual configuration
+### Step 4: Manual configuration
 
 The script handles everything it can via API. The following require manual action:
 
@@ -271,13 +225,17 @@ Set up your quality profiles and then add the series/movies/artists you want to 
 
 #### Prowlarr (http://192.168.1.242:49150)
 
-The setup script already connected Prowlarr to Sonarr, Radarr, and Lidarr. Add any indexers not covered by `setup-indexers.py` manually: Indexers → **+ Add Indexer**.
+`setup.sh` already connected Prowlarr to Sonarr, Radarr, and Lidarr and added public indexers. Add any additional indexers manually: Indexers → **+ Add Indexer**.
 
 #### Seerr (http://192.168.1.242:5056)
 
+Seerr needs its wizard completed before it can be wired up:
 1. Complete the setup wizard
 2. Connect Plex during the wizard: `http://plex:32400`
-3. Re-run `setup-arr-config.py` — it will wire up Sonarr and Radarr automatically
+3. Re-run `setup-arr-config.py` — it will wire up Sonarr and Radarr automatically:
+   ```bash
+   python3 /volume1/docker/media/setup-arr-config.py
+   ```
 
 #### Tautulli (http://192.168.1.242:8181)
 
@@ -295,7 +253,7 @@ docker exec recyclarr recyclarr sync
 
 ---
 
-### Step 8: Verify end-to-end
+### Step 5: Verify end-to-end
 
 1. Confirm Gluetun is connected — the IP should be your VPN's, not your home IP:
    ```bash
