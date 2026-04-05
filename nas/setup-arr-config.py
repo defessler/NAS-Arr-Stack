@@ -757,10 +757,43 @@ def main():
 
     # ── API keys — .env takes priority, config files are the fallback ───────────
     B = "/volume1/docker/media"
-    SONARR_KEY   = env.get('SONARR_API_KEY')   or read_arr_key(f"{B}/sonarr/config/config.xml")
-    RADARR_KEY   = env.get('RADARR_API_KEY')   or read_arr_key(f"{B}/radarr/config/config.xml")
-    LIDARR_KEY   = env.get('LIDARR_API_KEY')   or read_arr_key(f"{B}/lidarr/config/config.xml")
-    PROWLARR_KEY = env.get('PROWLARR_API_KEY') or read_arr_key(f"{B}/prowlarr/config/config.xml")
+
+    # On first boot, services write config.xml after a few seconds of startup.
+    # Poll all four config files together rather than reading once and giving up.
+    arr_configs = {
+        'sonarr':   (env.get('SONARR_API_KEY'),   f"{B}/sonarr/config/config.xml"),
+        'radarr':   (env.get('RADARR_API_KEY'),   f"{B}/radarr/config/config.xml"),
+        'lidarr':   (env.get('LIDARR_API_KEY'),   f"{B}/lidarr/config/config.xml"),
+        'prowlarr': (env.get('PROWLARR_API_KEY'), f"{B}/prowlarr/config/config.xml"),
+    }
+    resolved_keys = {}
+    pending = {}
+    for svc, (env_val, config_xml) in arr_configs.items():
+        key = env_val or read_arr_key(config_xml)
+        if key:
+            resolved_keys[svc] = key
+        else:
+            pending[svc] = config_xml
+
+    if pending:
+        names = ', '.join(s.title() for s in pending)
+        sys.stdout.write(f"  Waiting for config files ({names}) ")
+        sys.stdout.flush()
+        deadline = time.time() + 120
+        while pending and time.time() < deadline:
+            time.sleep(3)
+            sys.stdout.write('.'); sys.stdout.flush()
+            for svc in list(pending.keys()):
+                key = read_arr_key(pending[svc])
+                if key:
+                    resolved_keys[svc] = key
+                    del pending[svc]
+        print(f" {GREEN}✔{RESET}" if not pending else f" {RED}✘ missing: {', '.join(pending)}{RESET}")
+
+    SONARR_KEY   = resolved_keys.get('sonarr')
+    RADARR_KEY   = resolved_keys.get('radarr')
+    LIDARR_KEY   = resolved_keys.get('lidarr')
+    PROWLARR_KEY = resolved_keys.get('prowlarr')
     SABNZBD_KEY  = env.get('SABNZBD_API_KEY')  or read_sabnzbd_key(f"{B}/sabnzbd/config/sabnzbd.ini")
     BAZARR_KEY   = env.get('BAZARR_API_KEY')   or read_bazarr_key(f"{B}/bazarr/config")
     SEERR_KEY    = env.get('SEERR_API_KEY')    or read_json_key(f"{B}/seerr/config/settings.json", "main", "apiKey")
