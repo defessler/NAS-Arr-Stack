@@ -95,8 +95,8 @@ All deployment files live in the `nas/` folder. Copy the entire `nas/` directory
 | File | What it does |
 |------|-------------|
 | `docker-compose.yml` | Full stack definition |
-| `.env` | Config template — committed to git with all keys documented, no values |
-| `.env.local` | Your actual values — gitignored, never committed |
+| `.env.example` | Config template — committed to git with all keys documented, no values |
+| `.env` | Your actual values — gitignored, never committed; copy from `.env.example` |
 | `setup.sh` | Master script — runs all setup steps in order |
 | `setup-chmod.sh` | Sets correct permissions on all stack files |
 | `setup-folders.sh` | Creates required directories and sets ownership |
@@ -132,11 +132,11 @@ scp -r nas/ user@192.168.1.242:/volume1/docker/media/
 
 Copy the template and fill in your values:
 ```bash
-cp /volume1/docker/media/.env /volume1/docker/media/.env.local
-nano /volume1/docker/media/.env.local
+cp /volume1/docker/media/.env.example /volume1/docker/media/.env
+nano /volume1/docker/media/.env
 ```
 
-`.env` is the committed template with all keys documented. `.env.local` holds your real values and is gitignored — never committed.
+`.env.example` is the committed template with all keys documented. `.env` holds your real values and is gitignored — never committed. Docker Compose reads `.env` automatically.
 
 ```env
 PUID=1034
@@ -158,7 +158,7 @@ ARR_PASSWORD=                 # leave blank to skip auth setup
 NORDVPN_ACCESS_TOKEN=         # from my.nordaccount.com → NordVPN → Access Tokens
 VPN_PROVIDER=nordvpn
 VPN_TYPE=wireguard
-NORDVPN_PRIVATE_KEY=          # leave blank — setup-nordvpn.sh fills this in automatically
+NORDVPN_PRIVATE_KEY=          # leave blank — setup-nordvpn.sh fills this in
 VPN_COUNTRIES=                # e.g. United States, Netherlands
 ```
 
@@ -474,8 +474,8 @@ cp -a "/volume1/PlexMediaServer/AppData/Plex Media Server" \
 
 **Step 4 — Fix ownership**
 ```bash
-PUID=$(grep -m1 '^PUID=' /volume1/docker/media/.env.local | cut -d'=' -f2-)
-PGID=$(grep -m1 '^PGID=' /volume1/docker/media/.env.local | cut -d'=' -f2-)
+PUID=$(grep -m1 '^PUID=' /volume1/docker/media/.env | cut -d'=' -f2-)
+PGID=$(grep -m1 '^PGID=' /volume1/docker/media/.env | cut -d'=' -f2-)
 chown -R ${PUID}:${PGID} /volume1/docker/media/plex/config/
 ```
 

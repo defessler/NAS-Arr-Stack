@@ -67,10 +67,8 @@ def read_env(path):
     return env
 
 def read_env_merged(script_dir):
-    """.env.local (gitignored, real values) overrides .env (template, committed)."""
-    env = read_env(os.path.join(script_dir, '.env'))
-    env.update(read_env(os.path.join(script_dir, '.env.local')))
-    return env
+    """.env holds real values (gitignored). Copy from .env.example to create it."""
+    return read_env(os.path.join(script_dir, '.env'))
 
 def read_arr_key(config_xml):
     """Read API key from a *arr config.xml file."""

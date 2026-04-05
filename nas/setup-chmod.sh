@@ -36,12 +36,15 @@ if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
     echo "  ✔ docker-compose.yml"
 fi
 
-for env in .env .env.local; do
-    if [ -f "$SCRIPT_DIR/$env" ]; then
-        chmod 600 "$SCRIPT_DIR/$env"
-        echo "  ✔ $env (owner read-only — contains secrets)"
-    fi
-done
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    chmod 600 "$SCRIPT_DIR/.env"
+    echo "  ✔ .env (owner read-only — contains secrets)"
+fi
+
+if [ -f "$SCRIPT_DIR/.env.example" ]; then
+    chmod 644 "$SCRIPT_DIR/.env.example"
+    echo "  ✔ .env.example"
+fi
 
 echo ""
 echo "Done."

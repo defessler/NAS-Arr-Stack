@@ -185,12 +185,10 @@ def read_env(path):
     return env
 
 def read_env_merged(script_dir):
-    # .env/.env.local live in nas/ — walk up if this script is in a subdirectory
+    # .env lives in nas/ — walk up if this script is in a subdirectory
     candidates = [script_dir, os.path.dirname(script_dir)]
     env_dir = next((d for d in candidates if os.path.exists(os.path.join(d, '.env'))), script_dir)
-    env = read_env(os.path.join(env_dir, '.env'))
-    env.update(read_env(os.path.join(env_dir, '.env.local')))
-    return env
+    return read_env(os.path.join(env_dir, '.env'))
 
 def read_bazarr_key(config_dir):
     search_dirs = [config_dir, os.path.join(config_dir, 'config')]
