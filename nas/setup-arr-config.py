@@ -250,8 +250,25 @@ def add_download_client(base, key, api, name, implementation, field_overrides):
     existing = GET(base, key, f"/{api}/downloadclient")
     if existing is None:
         fail(f"Download client {name}: can't reach API"); return
-    if any(c['name'] == name for c in existing):
-        skip(f"Download client: {name}"); return
+
+    existing_client = next((c for c in existing if c['name'] == name), None)
+    if existing_client:
+        # Check if any field values differ — update if so (e.g. API key changed)
+        field_map = {f['name']: i for i, f in enumerate(existing_client.get('fields', []))}
+        needs_update = any(
+            fname in field_map and
+            existing_client['fields'][field_map[fname]].get('value') != fval
+            for fname, fval in field_overrides.items()
+        )
+        if not needs_update:
+            skip(f"Download client: {name}"); return
+        for fname, fval in field_overrides.items():
+            if fname in field_map:
+                existing_client['fields'][field_map[fname]]['value'] = fval
+        result = PUT(base, key, f"/{api}/downloadclient/{existing_client['id']}", existing_client)
+        ok(f"Download client: {name} (updated)") if result else fail(f"Download client: {name} (update failed)")
+        return
+
     schemas = GET(base, key, f"/{api}/downloadclient/schema")
     if not schemas:
         fail(f"Download client {name}: can't get schema"); return
