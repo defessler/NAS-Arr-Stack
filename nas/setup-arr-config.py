@@ -409,7 +409,11 @@ def configure_sabnzbd(base, key, ini_path):
     cur = sab_api(base, key, {'mode': 'get_config', 'section': 'misc',
                                'keyword': 'host_whitelist'})
     existing_raw = (cur or {}).get('config', {}).get('misc', {}).get('host_whitelist', '')
-    existing = {h.strip() for h in existing_raw.split(',') if h.strip()}
+    # SABnzbd API may return host_whitelist as a list or a comma-separated string
+    if isinstance(existing_raw, list):
+        existing = {h.strip() for h in existing_raw if h.strip()}
+    else:
+        existing = {h.strip() for h in existing_raw.split(',') if h.strip()}
     if REQUIRED_HOSTS.issubset(existing):
         skip("Host whitelist (already contains all required hostnames)")
     else:
