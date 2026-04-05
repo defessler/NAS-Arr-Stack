@@ -15,7 +15,14 @@ echo "  ✔ $SCRIPT_DIR"
 
 echo ""
 echo "Setting permissions on scripts..."
-for script in setup.sh setup-chmod.sh setup-folders.sh setup-firewall.sh setup-nordvpn.sh setup-validate.sh post-deploy-validate.sh qbittorrent-init.sh fix-qbit-paths.sh; do
+for script in setup.sh setup-chmod.sh setup-folders.sh setup-firewall.sh setup-nordvpn.sh setup-validate.sh post-deploy-validate.sh qbittorrent-init.sh; do
+    if [ -f "$SCRIPT_DIR/$script" ]; then
+        chmod 755 "$SCRIPT_DIR/$script"
+        echo "  ✔ $script"
+    fi
+done
+
+for script in migration/fix-qbit-paths.sh migration/fix-plex-paths.py indexers/setup-indexers.py indexers/setup-bazarr-providers.py; do
     if [ -f "$SCRIPT_DIR/$script" ]; then
         chmod 755 "$SCRIPT_DIR/$script"
         echo "  ✔ $script"
@@ -29,10 +36,12 @@ if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
     echo "  ✔ docker-compose.yml"
 fi
 
-if [ -f "$SCRIPT_DIR/.env" ]; then
-    chmod 600 "$SCRIPT_DIR/.env"
-    echo "  ✔ .env (owner read-only — contains secrets)"
-fi
+for env in .env .env.local; do
+    if [ -f "$SCRIPT_DIR/$env" ]; then
+        chmod 600 "$SCRIPT_DIR/$env"
+        echo "  ✔ $env (owner read-only — contains secrets)"
+    fi
+done
 
 echo ""
 echo "Done."
