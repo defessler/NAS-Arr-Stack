@@ -99,8 +99,7 @@ def _request(url, headers, method='GET', data=None):
         body_text = e.read().decode(errors='replace')
         print(f"    HTTP {e.code}: {body_text[:200]}")
         return None
-    except URLError as e:
-        print(f"    Connection error: {e}")
+    except (URLError, OSError):
         return None
 
 def _headers(key):

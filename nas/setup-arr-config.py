@@ -136,7 +136,7 @@ def _request(url, headers, method='GET', data=None):
         e._body_text = body_text
         print(f"    HTTP {e.code}: {body_text[:200]}")
         raise
-    except URLError:
+    except (URLError, OSError):
         return None
 
 def _safe_request(url, headers, method='GET', data=None):
@@ -151,8 +151,9 @@ def _safe_request(url, headers, method='GET', data=None):
         body_text = e.read().decode(errors='replace')
         print(f"    HTTP {e.code}: {body_text[:200]}")
         return None, e.code
-    except URLError:
+    except (URLError, OSError):
         return None, None
+
 
 def _arr_headers(key):
     return {'X-Api-Key': key, 'Content-Type': 'application/json',

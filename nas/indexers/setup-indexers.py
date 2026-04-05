@@ -117,7 +117,7 @@ def _request(url, headers, method='GET', data=None):
             return json.loads(content) if content else {}, resp.status, None
     except HTTPError as e:
         return None, e.code, e.read().decode(errors='replace')
-    except URLError:
+    except (URLError, OSError):
         return None, None, None
 
 def _prowlarr_error(body):
