@@ -220,15 +220,22 @@ def bazarr_post(base, key, path, data):
 
 # ── Wait for service ──────────────────────────────────────────────────────────
 
-def wait_ready(name, base, key, check_path, retries=24, interval=5):
+def wait_ready(name, base, key, check_path, retries=60, interval=5):
     sys.stdout.write(f"  Waiting for {name} ")
     sys.stdout.flush()
-    for _ in range(retries):
+    for i in range(retries):
         if GET(base, key, check_path) is not None:
-            print(f"{GREEN}✔{RESET}"); return True
+            elapsed = i * interval
+            print(f"{GREEN}✔{RESET} ({elapsed}s)"); return True
         sys.stdout.write("."); sys.stdout.flush()
+        # Print elapsed time every 30s so it's clear the script isn't frozen
+        if (i + 1) % 6 == 0:
+            elapsed = (i + 1) * interval
+            sys.stdout.write(f" {elapsed}s "); sys.stdout.flush()
         time.sleep(interval)
-    print(f"{RED}✘ timed out{RESET}"); return False
+    print(f"{RED}✘ timed out after {retries * interval}s{RESET}")
+    print(f"  {name} may still be starting — re-run this script once it's up")
+    return False
 
 # ── *arr helpers ──────────────────────────────────────────────────────────────
 
