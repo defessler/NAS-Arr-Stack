@@ -37,8 +37,8 @@ done
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-# Read .env values (can be overridden by env vars)
-env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | sed 's/#.*//' | xargs; }
+# Read .env values (can be overridden by env vars; strips \r for Windows-edited files)
+env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r' | sed 's/#.*//' | xargs; }
 
 QB_HOST="${QB_HOST:-$(env_val LAN_IP)}"
 QB_PORT="${QB_PORT:-49156}"

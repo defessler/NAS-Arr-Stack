@@ -22,8 +22,8 @@ section() {
     echo "── $1 ──────────────────────────────────────────"
 }
 
-# Helper: read a value from .env
-env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2; }
+# Helper: read a value from .env (strips \r for Windows-edited files)
+env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r'; }
 
 echo "============================================="
 echo "  Stack Validation"

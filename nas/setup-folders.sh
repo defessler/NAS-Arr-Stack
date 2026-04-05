@@ -17,8 +17,8 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-PUID=$(grep -m1 '^PUID=' "$ENV_FILE" | cut -d'=' -f2-)
-PGID=$(grep -m1 '^PGID=' "$ENV_FILE" | cut -d'=' -f2-)
+PUID=$(grep -m1 '^PUID=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '\r')
+PGID=$(grep -m1 '^PGID=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '\r')
 
 if [ -z "$PUID" ] || [ -z "$PGID" ]; then
     echo "Error: PUID and PGID must both be set in $ENV_FILE"
