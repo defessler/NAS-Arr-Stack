@@ -1,0 +1,11 @@
+# Test override — removes Plex dependencies and disables IPv6 for environments
+# that don't support it (this flag is only needed when running without IPv6).
+# Used with: docker compose -f docker-compose.yml -f docker-compose.test-override.yml
+services:
+  seerr:
+    depends_on: []
+  tautulli:
+    depends_on: []
+  sabnzbd:
+    environment:
+      HAS_IPV6: "false"

@@ -220,6 +220,25 @@ def bazarr_post(base, key, path, data):
                               'POST', data)
     return result
 
+def bazarr_post_form(base, key, path, form_data):
+    """POST form-encoded data to Bazarr.
+    Bazarr's /api/system/settings endpoint only accepts
+    application/x-www-form-urlencoded, not JSON."""
+    body = urlencode(form_data, doseq=True).encode()
+    headers = {'X-API-KEY': key,
+               'Content-Type': 'application/x-www-form-urlencoded',
+               'User-Agent': 'setup-arr-config/1.0'}
+    req = Request(f"{base}{path}", data=body, headers=headers, method='POST')
+    try:
+        with urlopen(req, timeout=15) as resp:
+            content = resp.read()
+            return json.loads(content) if content else {}
+    except HTTPError as e:
+        print(f"    HTTP {e.code}: {e.read().decode(errors='replace')[:200]}")
+        return None
+    except (URLError, OSError):
+        return None
+
 # ── Wait for service ──────────────────────────────────────────────────────────
 
 def wait_ready(name, base, key, check_path, retries=60, interval=5):
@@ -524,17 +543,23 @@ def configure_bazarr(base, key, sonarr_key, radarr_key, config_path,
     sonarr_cfg = settings.get('sonarr', {})
     radarr_cfg = settings.get('radarr', {})
     general    = settings.get('general', {})
+    auth       = settings.get('auth', {})
 
+    # Bazarr's /api/system/settings POST requires form-encoded data, not JSON.
+    # Keys use the format: settings-{section}-{field}.
+    # Boolean fields must use lowercase 'true'/'false' — dynaconf rejects
+    # capital-case strings ('True'/'False') for bool-typed validators.
+    form_data = {}
     changed = False
 
     # Sonarr connection
     if sonarr_key and sonarr_cfg.get('apikey') != sonarr_key:
-        sonarr_cfg.update({
-            'ip': 'sonarr', 'port': 8989,
-            'base_url': '/', 'ssl': False,
-            'apikey': sonarr_key,
-        })
-        general['use_sonarr'] = True
+        form_data['settings-sonarr-ip']          = 'sonarr'
+        form_data['settings-sonarr-port']        = '8989'
+        form_data['settings-sonarr-base_url']    = '/'
+        form_data['settings-sonarr-ssl']         = 'false'
+        form_data['settings-sonarr-apikey']      = sonarr_key
+        form_data['settings-general-use_sonarr'] = 'true'
         changed = True
         ok("Bazarr → Sonarr connection set")
     else:
@@ -542,34 +567,30 @@ def configure_bazarr(base, key, sonarr_key, radarr_key, config_path,
 
     # Radarr connection
     if radarr_key and radarr_cfg.get('apikey') != radarr_key:
-        radarr_cfg.update({
-            'ip': 'radarr', 'port': 7878,
-            'base_url': '/', 'ssl': False,
-            'apikey': radarr_key,
-        })
-        general['use_radarr'] = True
+        form_data['settings-radarr-ip']          = 'radarr'
+        form_data['settings-radarr-port']        = '7878'
+        form_data['settings-radarr-base_url']    = '/'
+        form_data['settings-radarr-ssl']         = 'false'
+        form_data['settings-radarr-apikey']      = radarr_key
+        form_data['settings-general-use_radarr'] = 'true'
         changed = True
         ok("Bazarr → Radarr connection set")
     else:
         skip("Bazarr → Radarr (already set)" if radarr_key else "Bazarr → Radarr (no Radarr key)")
 
     # Web UI credentials
-    auth = settings.get('auth', {})
     if username and password and auth.get('username') != username:
-        auth.update({'type': 'basic', 'username': username, 'password': password})
-        general['use_auth'] = True
-        settings['auth'] = auth
+        form_data['settings-auth-type']          = 'basic'
+        form_data['settings-auth-username']      = username
+        form_data['settings-auth-password']      = password
+        form_data['settings-general-use_auth']   = 'true'
         changed = True
         ok(f"Bazarr auth: {username}")
     elif username:
         skip(f"Bazarr auth: {username} (already set)")
 
     if changed:
-        payload = dict(settings)
-        payload['sonarr'] = sonarr_cfg
-        payload['radarr'] = radarr_cfg
-        payload['general'] = general
-        result = bazarr_post(base, key, "/api/system/settings", payload)
+        result = bazarr_post_form(base, key, "/api/system/settings", form_data)
         ok("Bazarr settings saved") if result is not None else fail("Bazarr settings: save failed")
 
 # ── Seerr ─────────────────────────────────────────────────────────────────────
