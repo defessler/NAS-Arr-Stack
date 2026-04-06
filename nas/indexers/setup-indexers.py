@@ -2,16 +2,17 @@
 """
 setup-indexers.py — Add indexers to Prowlarr
 
-Adds a curated set of public torrent indexers automatically.
-Usenet indexers are added if their API key is set in .env.
-Private torrent trackers (AvistaZ etc.) are added if credentials are in .env.
+Public torrent indexers are added automatically (no credentials needed).
+Free usenet indexers (AnimeTosho, ABNzb, Althub) are added automatically.
+Account-required usenet indexers are added if their key is set in .env.
+Private torrent trackers are added if credentials are set in .env.
 
 Safe to re-run — skips indexers that are already added.
 
 Usage:
     python3 /volume1/docker/media/indexers/setup-indexers.py
 
-.env keys for usenet (all Newznab-compatible):
+.env keys for usenet (account-required):
     NZBGEEK_API_KEY=
     NZBFINDER_API_KEY=
     DRUNKENSLUG_API_KEY=
@@ -20,6 +21,7 @@ Usage:
     DOGNZB_API_KEY=
     NINJACZENTRAL_API_KEY=
     TABULARASA_API_KEY=
+    ANIMETOSHO_API_KEY=    # optional — enhances AnimeTosho (works free without key too)
 
 .env keys for private torrent trackers:
     AVISTAZ_USER=          AVISTAZ_PASS=        # Asian movies/TV (private)
@@ -78,8 +80,14 @@ PUBLIC_TORRENT_INDEXERS = [
 
 # Newznab-compatible usenet indexers.
 # Each entry: (display_name, api_url, env_key_name)
+# env_key_name=None means free — added without a key.
 USENET_INDEXERS = [
-    ("NZBGeek",        "https://api.nzbgeek.info",        "NZBGEEK_API_KEY"),
+    # ── Free (no account required) ────────────────────────────────────────────
+    ("AnimeTosho",     "https://feed.animetosho.org",      None),              # Free anime NZBs; set ANIMETOSHO_API_KEY for higher limits
+    ("ABNzb",          "https://abnzb.com",                None),              # Free general indexer
+    ("Althub",         "https://www.althub.co.za",         None),              # Free general indexer
+    # ── Account required ──────────────────────────────────────────────────────
+    ("NZBGeek",        "https://api.nzbgeek.info",         "NZBGEEK_API_KEY"),
     ("NZBFinder",      "https://www.nzbfinder.ws",         "NZBFINDER_API_KEY"),
     ("DrunkenSlug",    "https://api.drunkenslug.com",      "DRUNKENSLUG_API_KEY"),
     ("NZBPlanet",      "https://api.nzbplanet.net",        "NZBPLANET_API_KEY"),
@@ -372,16 +380,17 @@ def main():
     # ── Usenet indexers ───────────────────────────────────────────────────────
 
     section("Usenet Indexers")
-    usenet_added = 0
     for name, api_url, env_key in USENET_INDEXERS:
-        api_key = env.get(env_key, '')
-        if not api_key:
-            skip(f"{name} (no {env_key} in .env)"); continue
-        add_newznab(PROWLARR, PROWLARR_KEY, name, api_url, api_key, schemas, existing_names)
-        usenet_added += 1
-
-    if usenet_added == 0:
-        warn("No usenet API keys found in .env — add NZBGEEK_API_KEY etc. to enable")
+        if env_key is None:
+            # Free indexer — add without a key (use optional key if available)
+            api_key = env.get(name.upper().replace(' ', '_') + '_API_KEY', '')
+            add_newznab(PROWLARR, PROWLARR_KEY, name, api_url, api_key, schemas, existing_names)
+        else:
+            api_key = env.get(env_key, '')
+            if not api_key:
+                skip(f"{name} (set {env_key} in .env to enable)")
+            else:
+                add_newznab(PROWLARR, PROWLARR_KEY, name, api_url, api_key, schemas, existing_names)
 
     # ── Private torrent trackers ──────────────────────────────────────────────
 
