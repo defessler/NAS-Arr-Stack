@@ -21,7 +21,6 @@ Usage:
     DOGNZB_API_KEY=
     NINJACZENTRAL_API_KEY=
     TABULARASA_API_KEY=
-    ANIMETOSHO_API_KEY=    # optional — enhances AnimeTosho (works free without key too)
 
 .env keys for private torrent trackers:
     AVISTAZ_USER=          AVISTAZ_PASS=        # Asian movies/TV (private)
@@ -83,7 +82,7 @@ PUBLIC_TORRENT_INDEXERS = [
 # env_key_name=None means free — added without a key.
 USENET_INDEXERS = [
     # ── Free (no account required) ────────────────────────────────────────────
-    ("AnimeTosho",     "https://feed.animetosho.org",      None),              # Free anime NZBs; set ANIMETOSHO_API_KEY for higher limits
+    ("AnimeTosho",     "https://feed.animetosho.org",      None),              # Free anime NZBs — no account needed
     ("ABNzb",          "https://abnzb.com",                None),              # Free general indexer
     ("Althub",         "https://www.althub.co.za",         None),              # Free general indexer
     # ── Account required ──────────────────────────────────────────────────────
