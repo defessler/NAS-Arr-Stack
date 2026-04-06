@@ -210,13 +210,15 @@ def sabnzbd_ini_set(ini_path, keyword, value):
         return False
 
 def bazarr_get(base, key, path):
-    return _request(f"{base}{path}", {'X-API-KEY': key,
-                                       'Content-Type': 'application/json'})
+    result, _ = _safe_request(f"{base}{path}", {'X-API-KEY': key,
+                                                 'Content-Type': 'application/json'})
+    return result
 
 def bazarr_post(base, key, path, data):
-    return _request(f"{base}{path}", {'X-API-KEY': key,
-                                       'Content-Type': 'application/json'},
-                    'POST', data)
+    result, _ = _safe_request(f"{base}{path}", {'X-API-KEY': key,
+                                                 'Content-Type': 'application/json'},
+                              'POST', data)
+    return result
 
 # ── Wait for service ──────────────────────────────────────────────────────────
 

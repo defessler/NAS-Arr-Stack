@@ -23,7 +23,7 @@ section() {
     echo "── $1 ──────────────────────────────────────────"
 }
 
-env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2; }
+env_val() { grep -m1 "^$1=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r'; }
 
 LAN_IP=$(env_val "LAN_IP")
 
